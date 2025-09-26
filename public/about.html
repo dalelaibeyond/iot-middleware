@@ -68,6 +68,17 @@
     
     <h2>Overview</h2>
     <div class="section">
+        <h3>High-Performance Framework</h3>
+        <p>
+            Built for high-volume IoT data processing with:
+            <ul>
+                <li>Parallel Processing with Worker Pool</li>
+                <li>Intelligent Message Batching</li>
+                <li>Rate Limiting and Circuit Breaking</li>
+                <li>Memory-Aware Operations</li>
+            </ul>
+        </p>
+
         <h3>Core Framework</h3>
         <p>
             Built on a modern, event-driven architecture with:
@@ -76,6 +87,17 @@
                 <li>Plugin System for extensible functionality</li>
                 <li>Message Processing Pipeline with middleware support</li>
                 <li>Dynamic module loading and configuration</li>
+            </ul>
+        </p>
+
+        <h3>Resilience Features</h3>
+        <p>
+            Designed for reliability under high load:
+            <ul>
+                <li>Automatic Circuit Breaking for error prevention</li>
+                <li>Intelligent Rate Limiting for traffic control</li>
+                <li>Smart Batching for optimal performance</li>
+                <li>Resource-aware scaling</li>
             </ul>
         </p>
 
@@ -111,25 +133,29 @@ module.exports = {
 
     <h2>System Architecture</h2>
     <div class="section">
-        <h3>Core Architecture</h3>
+        <h3>High-Performance Architecture</h3>
         <div class="mermaid">
         flowchart TB
-            MQTT[MQTT Broker] --> MH[MQTT Handler]
+            MQTT[MQTT Broker] --> RL[Rate Limiter]
+            RL --> MH[MQTT Handler]
             MH --> EB{Event Bus}
-            EB --> MP[Message Processor]
-            MP --> P1[Plugin 1]
-            MP --> P2[Plugin 2]
-            MP --> P3[Plugin 3]
+            EB --> WP[Worker Pool]
+            WP --> W1[Worker 1]
+            WP --> W2[Worker 2]
+            WP --> W3[Worker N]
+            W1 & W2 & W3 --> BM[Batch Manager]
+            BM --> DB[(Database)]
             
-            subgraph Core Framework
-                EB
-                MP
+            subgraph Processing Layer
+                WP
+                W1
+                W2
+                W3
             end
             
-            subgraph Plugins
-                P1
-                P2
-                P3
+            subgraph Resilience
+                RL
+                CB[Circuit Breaker]
             end
             
             P1 --> DS[Data Store]

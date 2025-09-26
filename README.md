@@ -1,10 +1,30 @@
 # IoT Middleware v3
 
 ## Overview
-Advanced IoT middleware that provides a robust bridge between MQTT-enabled devices and applications with:
+Advanced high-performance IoT middleware designed for processing thousands of concurrent sensor messages while providing a robust bridge between MQTT-enabled devices and applications.
 
-- **Core Framework**
-  - Event-driven architecture with central event bus
+### High-Performance Architecture
+- **Parallel Processing**
+  - Worker Pool for concurrent message processing
+  - Auto-scaling based on system load
+  - Worker health monitoring and recovery
+  - Efficient thread utilization
+
+- **Resilience Patterns**
+  - Circuit breaker for error prevention
+  - Rate limiting for traffic control
+  - Memory-aware operations
+  - Graceful degradation under high load
+
+- **Optimized Data Handling**
+  - Smart batch processing with memory management
+  - Write buffer optimization
+  - Efficient message queuing
+  - Performance monitoring and metrics
+
+### Core Features
+- **Event-Driven Framework**
+  - Central event bus for decoupled communication
   - Pluggable module system for extensibility
   - Middleware-based message processing pipeline
   - Dynamic plugin loading system

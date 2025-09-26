@@ -3,6 +3,9 @@ const { normalize } = require("./normalizers");
 const logger = require("../utils/logger");
 const eventBus = require("./core/eventBus");
 const MessageProcessor = require("./core/messageProcessor");
+const WorkerPool = require("./core/workerPool");
+const { CircuitBreaker, RateLimiter } = require("./core/resilience");
+const BatchManager = require("./core/batchManager");
 
 class MQTTHandler {
     constructor(options = {}) {
@@ -14,6 +17,26 @@ class MQTTHandler {
             mqttOptions: config.mqtt.options,
             ...options
         };
+
+        // Initialize resilience components
+        this.rateLimiter = new RateLimiter({
+            windowMs: 1000,  // 1 second
+            maxRequests: config.mqtt.rateLimit || 10000 // 10k messages per second
+        });
+
+        this.circuitBreaker = new CircuitBreaker({
+            threshold: 0.5,     // 50% error rate
+            windowSize: 10000,  // 10 seconds
+            minRequests: 10,    // Minimum requests before tripping
+            timeout: 30000     // 30 seconds breaker timeout
+        });
+
+        // Initialize batch manager
+        this.batchManager = new BatchManager({
+            batchSize: config.writeBuffer.batchSize || 1000,
+            flushInterval: config.writeBuffer.flushInterval || 1000,
+            maxBatchSize: config.writeBuffer.maxBatchSize || 10000
+        });
 
         // Store dependencies
         this.dataStore = options.dataStore;
