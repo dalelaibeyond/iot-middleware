@@ -1,0 +1,37 @@
+{
+    "mqtt": {
+        "topics": ["sensors/#", "devices/#"],
+        "options": {
+            "qos": 1,
+            "reconnectPeriod": 5000,
+            "keepalive": 60
+        }
+    },
+    "server": {
+        "rateLimit": {
+            "windowMs": 900000,
+            "maxRequests": 100
+        },
+        "compression": {
+            "level": 6,
+            "threshold": "1kb"
+        }
+    },
+    "writeBuffer": {
+        "maxSize": 1000,
+        "flushInterval": 5000,
+        "maxRetries": 3
+    },
+    "callbacks": {
+        "retryLimit": 3,
+        "retryDelay": 1000
+    },
+    "logger": {
+        "level": "info",
+        "file": {
+            "dir": "logs",
+            "filename": "app.log"
+        },
+        "format": "[{timestamp}] {level} {message}"
+    }
+}

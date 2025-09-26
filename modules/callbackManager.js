@@ -3,9 +3,11 @@ const logger = require('../utils/logger');
 
 class CallbackManager {
     constructor() {
+        const config = require('../config/config.json');
+        
         this.callbacks = new Map();
-        this.retryLimit = 3;
-        this.retryDelay = 1000; // Start with 1 second
+        this.retryLimit = config.callbacks.retryLimit;
+        this.retryDelay = config.callbacks.retryDelay;
     }
 
     registerCallback(url, config = {}) {

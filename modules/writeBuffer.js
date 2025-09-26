@@ -2,11 +2,13 @@ const logger = require('../utils/logger');
 
 class WriteBuffer {
     constructor(dbStore, options = {}) {
+        const config = require('../config/config.json');
+        
         this.dbStore = dbStore;
         this.buffer = [];
-        this.maxSize = options.maxSize || 1000;
-        this.flushInterval = options.flushInterval || 5000; // 5 seconds
-        this.maxRetries = options.maxRetries || 3;
+        this.maxSize = options.maxSize || config.writeBuffer.maxSize;
+        this.flushInterval = options.flushInterval || config.writeBuffer.flushInterval;
+        this.maxRetries = options.maxRetries || config.writeBuffer.maxRetries;
         this.isFlushing = false;
 
         // Start periodic flush

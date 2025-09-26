@@ -37,14 +37,17 @@ const writeBuffer = new WriteBuffer(dbStore, {
 });
 app.set('writeBuffer', writeBuffer);
 
+// Load configuration
+const config = require('./config/config.json');
+
 // Rate limiting
 const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100 // limit each IP to 100 requests per windowMs
+    windowMs: config.server.rateLimit.windowMs,
+    max: config.server.rateLimit.maxRequests
 });
 
 // Middleware
-app.use(compression()); // Enable compression
+app.use(compression(config.server.compression)); // Enable compression with config
 app.use(express.json());
 app.use(limiter); // Apply rate limiting
 
@@ -62,45 +65,13 @@ app.use("/", indexRoutes);
 app.use("/api", apiRoutes);
 app.use("/system", systemRoutes);
 
-// Initialize MQTT client
-const mqttClient = require("./modules/mqttClient");
-const { normalize } = require("./modules/normalizers");
-
-// Handle MQTT messages
-mqttClient.removeAllListeners('message'); // Remove existing message handler
-mqttClient.on("message", async (topic, message) => {
-    try {
-        logger.debug(`Received message on topic ${topic}`);
-        
-        const meta = {
-            gatewayId: topic.split("/")[1]
-        };
-
-        const normalized = normalize(topic, message, meta);
-        if (normalized) {
-            logger.debug(`Normalized message for device ${normalized.deviceId}`);
-            
-            // Store latest data in memory
-            dataStore.set(normalized.deviceId, normalized);
-            logger.debug(`Updated latest data for device ${normalized.deviceId}`);
-            
-            // Broadcast to WebSocket clients
-            wsServer.broadcast(normalized);
-            logger.debug(`Broadcasted to WebSocket clients`);
-            
-            // Send to registered callbacks
-            await callbackManager.notify(normalized);
-            logger.debug(`Notified registered callbacks`);
-            
-            // Use write buffer for database operations
-            await writeBuffer.push(normalized);
-            logger.debug(`Pushed to write buffer`);
-        } else {
-            logger.error(`Failed to normalize message for topic ${topic}`);
-        }
-    } catch (error) {
-        logger.error('Error processing MQTT message:', error);
-    }
+// Initialize MQTT client with all dependencies
+const createMQTTClient = require("./modules/mqttClient");
+const mqttHandler = createMQTTClient({
+    dataStore,
+    writeBuffer,
+    wsServer,
+    callbackManager
 });
 
 // Graceful shutdown

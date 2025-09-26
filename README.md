@@ -5,6 +5,7 @@ Advanced IoT middleware that provides a robust bridge between MQTT-enabled devic
 
 - **Real-time Data Processing**
   - MQTT message normalization with configurable schemas
+  - Multi-topic MQTT subscription support
   - WebSocket broadcasting for real-time updates
   - HTTP callback notifications with retry mechanism
   - In-memory latest data store
@@ -34,7 +35,13 @@ Advanced IoT middleware that provides a robust bridge between MQTT-enabled devic
 npm install
 ```
 
-### 2. Configure Environment Variables
+### 2. Configuration
+
+The middleware uses a two-tier configuration system:
+1. Environment-specific variables in `.env`
+2. System-wide settings in `config/config.json`
+
+#### 2.1 Environment Variables (`.env`)
 Create a `.env` file with:
 ```properties
 # Server Configuration
@@ -42,7 +49,7 @@ PORT=3000
 NODE_ENV=development
 DEBUG=true
 
-# MQTT Configuration
+# MQTT Connection
 MQTT_URL=mqtt://localhost:1883
 
 # Database Configuration
@@ -50,11 +57,77 @@ DB_HOST=localhost
 DB_USER=root
 DB_PASS=yourpassword
 DB_NAME=iot_middleware
-
-# Performance Tuning
-WRITE_BUFFER_SIZE=1000
-WRITE_BUFFER_INTERVAL=5000
 ```
+
+#### 2.2 System Configuration (`config/config.json`)
+Create or modify `config/config.json` to control system behavior:
+
+```json
+{
+    "mqtt": {
+        "topics": [
+            "sensors/#",
+            "devices/#"
+        ],
+        "options": {
+            "qos": 1,
+            "reconnectPeriod": 5000,
+            "keepalive": 60
+        }
+    },
+    "server": {
+        "rateLimit": {
+            "windowMs": 900000,
+            "maxRequests": 100
+        },
+        "compression": {
+            "level": 6,
+            "threshold": "1kb"
+        }
+    },
+    "writeBuffer": {
+        "maxSize": 1000,
+        "flushInterval": 5000,
+        "maxRetries": 3
+    },
+    "callbacks": {
+        "retryLimit": 3,
+        "retryDelay": 1000
+    },
+    "logger": {
+        "level": "info",
+        "file": {
+            "dir": "logs",
+            "filename": "app.log"
+        },
+        "format": "[{timestamp}] {level} {message}"
+    }
+}
+```
+
+##### Configuration Sections:
+
+- **mqtt**: MQTT subscription settings
+  - `topics`: Array of topics to subscribe to
+  - `options`: MQTT client options (QoS, reconnection, etc.)
+
+- **server**: HTTP server settings
+  - `rateLimit`: API rate limiting configuration
+  - `compression`: Response compression settings
+
+- **writeBuffer**: Database write optimization
+  - `maxSize`: Maximum records before forced flush
+  - `flushInterval`: Milliseconds between auto-flushes
+  - `maxRetries`: Retry attempts for failed writes
+
+- **callbacks**: HTTP callback settings
+  - `retryLimit`: Maximum retry attempts
+  - `retryDelay`: Milliseconds between retries
+
+- **logger**: Logging configuration
+  - `level`: Log level (error, warn, info, debug)
+  - `file`: Log file settings
+  - `format`: Log message format template
 
 ### 3. Database Setup
 Create MySQL database and tables:
@@ -165,16 +238,18 @@ Content-Type: application/json
 ```
 iot-middleware-v3/
 ├── config/
-│   ├── db.js              # Database configuration
-│   └── schema.sql         # Database schema
+│   ├── config.json        # System configuration
+│   ├── db.js             # Database configuration
+│   └── schema.sql        # Database schema
 ├── modules/
-│   ├── mqttClient.js      # MQTT subscriber
-│   ├── wsServer.js        # WebSocket server
-│   ├── writeBuffer.js     # Database write buffer
+│   ├── mqttClient.js     # MQTT subscriber
+│   ├── mqttHandler.js    # MQTT message handler
+│   ├── wsServer.js       # WebSocket server
+│   ├── writeBuffer.js    # Database write buffer
 │   ├── callbackManager.js # HTTP callbacks
-│   ├── dataStore.js       # In-memory store
-│   ├── dbStore.js         # MySQL operations
-│   └── normalizers/       # Message normalizers
+│   ├── dataStore.js      # In-memory store
+│   ├── dbStore.js        # MySQL operations
+│   └── normalizers/      # Message normalizers
 ├── routes/
 │   ├── api.js            # API routes
 │   ├── index.js          # Main routes
@@ -240,16 +315,25 @@ Returns:
    - Use TLS for MQTT (mqtts://)
    - Enable authentication
    - Set up proper firewall rules
+   - Configure appropriate rate limits
 
-2. **Scaling**
+2. **Configuration**
+   - Adjust buffer sizes based on load
+   - Set appropriate retry limits
+   - Configure logging levels
+   - Tune compression settings
+
+3. **Scaling**
    - Implement Redis for shared state
    - Use database replication
    - Consider message queue for high load
+   - Configure multiple MQTT topics
 
-3. **Monitoring**
-   - Set up proper logging
+4. **Monitoring**
+   - Set up proper logging levels
    - Monitor system metrics
    - Configure alerts
+   - Watch write buffer metrics
 
 ## Contributing
 

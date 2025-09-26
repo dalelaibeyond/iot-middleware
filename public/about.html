@@ -4,16 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>IoT Middleware v3 - Documentation</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
             line-height: 1.6;
-            max-width: 800px;
+            max-width: 1000px;
             margin: 0 auto;
             padding: 20px;
             color: #333;
         }
-        h1, h2 { color: #2c3e50; }
+        h1, h2, h3 { color: #2c3e50; }
         pre {
             background: #f5f5f5;
             padding: 15px;
@@ -34,21 +35,133 @@
             margin-top: 20px;
             display: none;
         }
+        .mermaid {
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin: 20px 0;
+        }
+        .config-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        .config-table th, .config-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        .config-table th {
+            background-color: #f5f5f5;
+        }
+        .section {
+            margin: 40px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
     </style>
 </head>
 <body>
     <h1>IoT Middleware v3</h1>
     
     <h2>Overview</h2>
-    <p>
-        This middleware service bridges MQTT-enabled IoT devices with applications by:
-        <ul>
-            <li>Normalizing raw MQTT messages into a unified JSON format</li>
-            <li>Storing the latest readings in memory for fast access</li>
-            <li>Persisting historical data in MySQL</li>
-            <li>Providing REST APIs for data access</li>
-        </ul>
-    </p>
+    <div class="section">
+        <p>
+            This middleware service bridges MQTT-enabled IoT devices with applications by:
+            <ul>
+                <li>Supporting multiple MQTT topic subscriptions</li>
+                <li>Normalizing raw MQTT messages into a unified JSON format</li>
+                <li>Storing the latest readings in memory for fast access</li>
+                <li>Persisting historical data in MySQL with write buffering</li>
+                <li>Providing REST APIs for data access</li>
+                <li>Supporting real-time WebSocket updates</li>
+                <li>Offering HTTP callbacks with retry mechanism</li>
+            </ul>
+        </p>
+    </div>
+
+    <h2>System Flow</h2>
+    <div class="section">
+        <h3>Main Processing Flow</h3>
+        <div class="mermaid">
+        flowchart TB
+            MQTT[MQTT Broker] --> MH[MQTT Handler]
+            MH --> N[Message Normalizer]
+            N --> DS[Data Store]
+            N --> WB[Write Buffer]
+            N --> WS[WebSocket Server]
+            N --> CB[Callback Manager]
+            DS --> API[REST API]
+            WB --> DB[(MySQL Database)]
+            WS --> Client[WebSocket Clients]
+            CB --> HTTP[HTTP Callbacks]
+            
+            subgraph Processing
+                MH
+                N
+            end
+            
+            subgraph Storage
+                DS
+                WB
+                DB
+            end
+            
+            subgraph Distribution
+                WS
+                CB
+                API
+            end
+        </div>
+
+        <h3>Write Buffer Process</h3>
+        <div class="mermaid">
+        flowchart LR
+            D[Data] --> WB[Write Buffer]
+            WB --> C{Check Size}
+            C -->|>= maxSize| F[Flush to DB]
+            C -->|< maxSize| W[Wait]
+            W --> T[Timer]
+            T -->|flushInterval| F
+            F --> R{Retry?}
+            R -->|Yes| F
+            R -->|No| E[Error Handler]
+        </div>
+    </div>
+
+    <h2>Configuration</h2>
+    <div class="section">
+        <h3>System Configuration</h3>
+        <table class="config-table">
+            <tr>
+                <th>Component</th>
+                <th>Configuration</th>
+                <th>Description</th>
+            </tr>
+            <tr>
+                <td>MQTT</td>
+                <td>topics, QoS, reconnection</td>
+                <td>Multiple topic subscriptions, connection settings</td>
+            </tr>
+            <tr>
+                <td>Write Buffer</td>
+                <td>size, interval, retries</td>
+                <td>Database write optimization settings</td>
+            </tr>
+            <tr>
+                <td>Callbacks</td>
+                <td>retry limit, delay</td>
+                <td>HTTP notification retry settings</td>
+            </tr>
+            <tr>
+                <td>Server</td>
+                <td>rate limits, compression</td>
+                <td>API protection and optimization</td>
+            </tr>
+        </table>
+    </div>
 
     <h2>API Documentation</h2>
     
@@ -64,7 +177,20 @@
     <pre>GET /api/history/:deviceId?limit=50</pre>
 
     <h2>Message Format</h2>
-    <pre>
+    <div class="section">
+        <h3>Input Example (Raw MQTT Message)</h3>
+        <pre>
+{
+  "devId": "A-Temp-001",
+  "rackNo": "42",
+  "posU": "18",
+  "tmp": 27.3,
+  "unit": "C",
+  "time": 1695653130000
+}</pre>
+
+        <h3>Normalized Format</h3>
+        <pre>
 {
   "deviceId": "string",        // unique device id
   "sensorType": "string",      // e.g. "temperature"
@@ -72,15 +198,21 @@
   "seq": 12345,                // optional sequence number
   "payload": {                 // sensor-specific data
      "temp": 28.3,
-     "unit": "C"
+     "unit": "C",
+     "rackNo": "42",
+     "posU": "18"
   },
   "meta": {                    // metadata
      "rawTopic": "sensors/gateway-1/temp",
      "gatewayId": "gateway-1"
   }
 }</pre>
+    </div>
 
     <script>
+        // Initialize Mermaid
+        mermaid.initialize({ startOnLoad: true, theme: 'default' });
+        
         async function tryLatest() {
             const response = document.getElementById('latestResponse');
             response.style.display = 'block';
