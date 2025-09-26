@@ -68,6 +68,18 @@
     
     <h2>Overview</h2>
     <div class="section">
+        <h3>Core Framework</h3>
+        <p>
+            Built on a modern, event-driven architecture with:
+            <ul>
+                <li>Central Event Bus for decoupled communication</li>
+                <li>Plugin System for extensible functionality</li>
+                <li>Message Processing Pipeline with middleware support</li>
+                <li>Dynamic module loading and configuration</li>
+            </ul>
+        </p>
+
+        <h3>Features</h3>
         <p>
             This middleware service bridges MQTT-enabled IoT devices with applications by:
             <ul>
@@ -82,37 +94,64 @@
         </p>
     </div>
 
-    <h2>System Flow</h2>
+    <h2>Plugin System</h2>
     <div class="section">
-        <h3>Main Processing Flow</h3>
+        <p>Extend functionality through plugins:</p>
+        <pre>
+// Example plugin
+module.exports = {
+    initialize: async (eventBus) => {
+        eventBus.subscribe('message.received', 
+            async (message) => {
+                // Custom processing
+            });
+    }
+};</pre>
+    </div>
+
+    <h2>System Architecture</h2>
+    <div class="section">
+        <h3>Core Architecture</h3>
         <div class="mermaid">
         flowchart TB
             MQTT[MQTT Broker] --> MH[MQTT Handler]
-            MH --> N[Message Normalizer]
-            N --> DS[Data Store]
-            N --> WB[Write Buffer]
-            N --> WS[WebSocket Server]
-            N --> CB[Callback Manager]
+            MH --> EB{Event Bus}
+            EB --> MP[Message Processor]
+            MP --> P1[Plugin 1]
+            MP --> P2[Plugin 2]
+            MP --> P3[Plugin 3]
+            
+            subgraph Core Framework
+                EB
+                MP
+            end
+            
+            subgraph Plugins
+                P1
+                P2
+                P3
+            end
+            
+            P1 --> DS[Data Store]
+            P2 --> WB[Write Buffer]
+            P3 --> WS[WebSocket]
             DS --> API[REST API]
-            WB --> DB[(MySQL Database)]
-            WS --> Client[WebSocket Clients]
-            CB --> HTTP[HTTP Callbacks]
+            WB --> DB[(MySQL)]
+            WS --> Client[Clients]
+        </div>
+
+        <h3>Message Processing Pipeline</h3>
+        <div class="mermaid">
+        flowchart LR
+            M[Message] --> MW1[Middleware 1]
+            MW1 --> MW2[Middleware 2]
+            MW2 --> MW3[Middleware 3]
+            MW3 --> R[Result]
             
-            subgraph Processing
-                MH
-                N
-            end
-            
-            subgraph Storage
-                DS
-                WB
-                DB
-            end
-            
-            subgraph Distribution
-                WS
-                CB
-                API
+            subgraph Pipeline
+                MW1
+                MW2
+                MW3
             end
         </div>
 
@@ -129,6 +168,38 @@
             R -->|Yes| F
             R -->|No| E[Error Handler]
         </div>
+    </div>
+
+    <h2>Event System</h2>
+    <div class="section">
+        <h3>Core Events</h3>
+        <table class="config-table">
+            <tr>
+                <th>Event</th>
+                <th>Description</th>
+                <th>Example Data</th>
+            </tr>
+            <tr>
+                <td>message.received</td>
+                <td>Raw message from MQTT broker</td>
+                <td>{topic, payload, timestamp}</td>
+            </tr>
+            <tr>
+                <td>message.processed</td>
+                <td>Processed and normalized message</td>
+                <td>{deviceId, sensorType, payload}</td>
+            </tr>
+            <tr>
+                <td>message.error</td>
+                <td>Processing error occurred</td>
+                <td>{error, message, context}</td>
+            </tr>
+            <tr>
+                <td>system.startup</td>
+                <td>System initialization</td>
+                <td>{config, timestamp}</td>
+            </tr>
+        </table>
     </div>
 
     <h2>Configuration</h2>

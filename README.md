@@ -3,6 +3,12 @@
 ## Overview
 Advanced IoT middleware that provides a robust bridge between MQTT-enabled devices and applications with:
 
+- **Core Framework**
+  - Event-driven architecture with central event bus
+  - Pluggable module system for extensibility
+  - Middleware-based message processing pipeline
+  - Dynamic plugin loading system
+
 - **Real-time Data Processing**
   - MQTT message normalization with configurable schemas
   - Multi-topic MQTT subscription support
@@ -242,6 +248,12 @@ iot-middleware-v3/
 │   ├── db.js             # Database configuration
 │   └── schema.sql        # Database schema
 ├── modules/
+│   ├── core/             # Core framework components
+│   │   ├── eventBus.js   # Central event system
+│   │   ├── messageProcessor.js # Message pipeline
+│   │   └── pluginManager.js # Plugin system
+│   ├── plugins/          # Extensible plugins
+│   │   └── messageEnrichment.js # Message enhancement
 │   ├── mqttClient.js     # MQTT subscriber
 │   ├── mqttHandler.js    # MQTT message handler
 │   ├── wsServer.js       # WebSocket server

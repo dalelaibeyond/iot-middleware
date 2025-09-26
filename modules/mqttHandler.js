@@ -1,6 +1,8 @@
 const mqtt = require("mqtt");
 const { normalize } = require("./normalizers");
 const logger = require("../utils/logger");
+const eventBus = require("./core/eventBus");
+const MessageProcessor = require("./core/messageProcessor");
 
 class MQTTHandler {
     constructor(options = {}) {
@@ -13,10 +15,15 @@ class MQTTHandler {
             ...options
         };
 
+        // Store dependencies
         this.dataStore = options.dataStore;
         this.writeBuffer = options.writeBuffer;
         this.wsServer = options.wsServer;
         this.callbackManager = options.callbackManager;
+
+        // Initialize message processor
+        this.messageProcessor = new MessageProcessor();
+        this.initializeMessagePipeline();
 
         this.client = null;
         this.isConnected = false;
@@ -71,35 +78,59 @@ class MQTTHandler {
         }
     }
 
-    async processNormalizedMessage(normalized) {
-        logger.debug(`Processing normalized message for device ${normalized.deviceId}`);
-
-        try {
-            // Store latest data in memory
+    initializeMessagePipeline() {
+        // Add middleware for storing latest data
+        this.messageProcessor.use(async (message, context, next) => {
             if (this.dataStore) {
-                this.dataStore.set(normalized.deviceId, normalized);
-                logger.debug(`Updated latest data for device ${normalized.deviceId}`);
+                this.dataStore.set(message.deviceId, message);
+                logger.debug(`Updated latest data for device ${message.deviceId}`);
             }
+            await next();
+        });
 
-            // Broadcast to WebSocket clients
+        // Add middleware for WebSocket broadcasting
+        this.messageProcessor.use(async (message, context, next) => {
             if (this.wsServer) {
-                this.wsServer.broadcast(normalized);
+                this.wsServer.broadcast(message);
                 logger.debug(`Broadcasted to WebSocket clients`);
             }
+            await next();
+        });
 
-            // Send to registered callbacks
+        // Add middleware for callback notifications
+        this.messageProcessor.use(async (message, context, next) => {
             if (this.callbackManager) {
-                await this.callbackManager.notify(normalized);
+                await this.callbackManager.notify(message);
                 logger.debug(`Notified registered callbacks`);
             }
+            await next();
+        });
 
-            // Use write buffer for database operations
+        // Add middleware for database operations
+        this.messageProcessor.use(async (message, context, next) => {
             if (this.writeBuffer) {
-                await this.writeBuffer.push(normalized);
+                await this.writeBuffer.push(message);
                 logger.debug(`Pushed to write buffer`);
             }
+            await next();
+        });
+
+        // Subscribe to relevant events
+        eventBus.subscribe('message.error', (error) => {
+            logger.error('Error in message processing:', error);
+        });
+    }
+
+    async processNormalizedMessage(normalized) {
+        logger.debug(`Processing normalized message for device ${normalized.deviceId}`);
+        try {
+            await this.messageProcessor.process(normalized, {
+                topic: this.options.topics,
+                timestamp: new Date()
+            });
         } catch (error) {
             logger.error(`Error in message processing pipeline:`, error);
+            eventBus.publish('message.error', error);
         }
     }
 
