@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IoT Middleware v3 - Deep Technical Documentation</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            line-height: 1.6;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            color: #333;
+        }
+        h1, h2, h3, h4 { 
+            color: #2c3e50;
+            margin-top: 1.5em;
+        }
+        pre {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        .mermaid {
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin: 20px 0;
+        }
+        .section {
+            margin: 40px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        .table-container {
+            overflow-x: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f5f5f5;
+        }
+        .module-card {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 10px 0;
+            background: #fff;
+        }
+        .dependency-arrow {
+            color: #666;
+            margin: 0 5px;
+        }
+        .code-comment {
+            color: #666;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <h1>IoT Middleware v3 - Deep Technical Documentation</h1>
+
+    <div class="section">
+        <h2>1. Architecture Overview</h2>
+
+        <h3>High-Level Architecture</h3>
+        <div class="mermaid">
+        flowchart TB
+            MQTT[MQTT Broker] --> MH[MQTT Handler]
+            MH --> EB{Event Bus}
+            EB --> WP[Worker Pool]
+            WP --> W1[Worker 1]
+            WP --> W2[Worker 2]
+            WP --> W3[Worker N]
+            W1 & W2 & W3 --> BM[Batch Manager]
+            BM --> DB[(MySQL)]
+            
+            EB --> DS[Data Store]
+            DS --> API[REST API]
+            EB --> WS[WebSocket Server]
+            WS --> Client[Clients]
+            EB --> CB[Callback Manager]
+            CB --> ExtAPI[External APIs]
+
+            subgraph Resilience Layer
+                Circuit[Circuit Breaker]
+                Rate[Rate Limiter]
+            end
+
+            subgraph Core Layer
+                EB
+                WP
+                BM
+            end
+
+            subgraph Storage Layer
+                DS
+                DB
+            end
+
+            subgraph Interface Layer
+                API
+                WS
+                CB
+            end
+        </div>
+
+        <h3>Message Processing Flow</h3>
+        <div class="mermaid">
+        sequenceDiagram
+            participant MQTT as MQTT Broker
+            participant Handler as MQTT Handler
+            participant Worker as Worker Pool
+            participant Bus as Event Bus
+            participant Store as Data Store
+            participant DB as MySQL
+            participant WS as WebSocket
+
+            MQTT->>Handler: Raw Message
+            Handler->>Worker: Process Message
+            Worker->>Bus: Normalized Message
+            Bus->>Store: Update Latest
+            Bus->>DB: Store History
+            Bus->>WS: Broadcast Update
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>2. Core Components & Dependencies</h2>
+
+        <h3>Module Dependencies</h3>
+        <div class="mermaid">
+        flowchart LR
+            Server[server.js] --> Routes[routes/]
+            Server --> MQTT[mqttClient.js]
+            MQTT --> Handler[mqttHandler.js]
+            Handler --> EventBus[eventBus.js]
+            Handler --> WorkerPool[workerPool.js]
+            Handler --> Resilience[resilience.js]
+            Handler --> BatchMgr[batchManager.js]
+            Routes --> DataStore[dataStore.js]
+            Routes --> DBStore[dbStore.js]
+            Handler --> Normalizers[normalizers/]
+            DBStore --> DB[(MySQL)]
+            Handler --> WSServer[wsServer.js]
+            Handler --> CallbackMgr[callbackManager.js]
+        </div>
+
+        <h3>Core Module Responsibilities</h3>
+        <div class="module-card">
+            <h4>server.js</h4>
+            <p>Main application entry point:</p>
+            <ul>
+                <li>Express server initialization</li>
+                <li>Route configuration</li>
+                <li>Core services initialization</li>
+                <li>Static file serving</li>
+            </ul>
+            <p>Dependencies: express, http, routes/, mqttClient.js, wsServer.js, writeBuffer.js</p>
+        </div>
+
+        <div class="module-card">
+            <h4>core/eventBus.js</h4>
+            <p>Central event system:</p>
+            <ul>
+                <li>Message routing between components</li>
+                <li>Event subscription management</li>
+                <li>Decoupled communication</li>
+            </ul>
+            <p>Key Events:</p>
+            <ul>
+                <li>message.received - Raw message arrived</li>
+                <li>message.processed - Normalized message ready</li>
+                <li>message.error - Processing error occurred</li>
+                <li>batch.ready - Batch ready for processing</li>
+            </ul>
+        </div>
+
+        <div class="module-card">
+            <h4>core/workerPool.js</h4>
+            <p>Parallel processing management:</p>
+            <ul>
+                <li>Worker thread management</li>
+                <li>Task distribution</li>
+                <li>Worker health monitoring</li>
+                <li>Auto-scaling based on CPU cores</li>
+            </ul>
+        </div>
+
+        <div class="module-card">
+            <h4>core/batchManager.js</h4>
+            <p>Efficient batch processing:</p>
+            <ul>
+                <li>Message batching</li>
+                <li>Batch size management</li>
+                <li>Periodic flushing</li>
+                <li>Memory usage optimization</li>
+            </ul>
+        </div>
+
+        <div class="module-card">
+            <h4>core/resilience.js</h4>
+            <p>System protection:</p>
+            <ul>
+                <li>Circuit breaker pattern</li>
+                <li>Rate limiting</li>
+                <li>Error threshold management</li>
+                <li>Service degradation handling</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>3. Data Flow & Message Processing</h2>
+
+        <h3>Message Transformation Pipeline</h3>
+        <div class="mermaid">
+        flowchart LR
+            Raw[Raw MQTT Message] --> Normalize[Normalizer]
+            Normalize --> Validate[Validation]
+            Validate --> Enrich[Enrichment]
+            Enrich --> Process[Processing]
+            Process --> Store[Storage]
+            Process --> Notify[Notification]
+        </div>
+
+        <h3>Message Format Evolution</h3>
+        <pre>
+// 1. Raw MQTT Message
+{
+    "devId": "A-Temp-001",
+    "rackNo": "42",
+    "posU": "18",
+    "tmp": 27.3,
+    "unit": "C",
+    "time": 1695653130000
+}
+
+// 2. Normalized Message
+{
+    "deviceId": "A-Temp-001",
+    "sensorType": "temperature",
+    "ts": "2025-09-25T08:05:30.000Z",
+    "payload": {
+        "temp": 27.3,
+        "unit": "C",
+        "rackNo": "42",
+        "posU": "18"
+    },
+    "meta": {
+        "rawTopic": "sensors/temperature/aa",
+        "gatewayId": "gateway-1"
+    }
+}
+        </pre>
+    </div>
+
+    <div class="section">
+        <h2>4. Configuration & Environment</h2>
+
+        <h3>Configuration Files</h3>
+        <table>
+            <tr>
+                <th>File</th>
+                <th>Purpose</th>
+                <th>Critical Settings</th>
+            </tr>
+            <tr>
+                <td>config.json</td>
+                <td>Core configuration</td>
+                <td>
+                    - MQTT topics & options<br>
+                    - Rate limits<br>
+                    - Write buffer settings<br>
+                    - Callback retry config
+                </td>
+            </tr>
+            <tr>
+                <td>.env</td>
+                <td>Environment variables</td>
+                <td>
+                    - MQTT connection URL<br>
+                    - Database credentials<br>
+                    - Server port<br>
+                    - Debug flags
+                </td>
+            </tr>
+            <tr>
+                <td>schema.sql</td>
+                <td>Database schema</td>
+                <td>
+                    - Table definitions<br>
+                    - Indexes<br>
+                    - Constraints
+                </td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="section">
+        <h2>5. Setting Up & Running</h2>
+
+        <h3>Prerequisites</h3>
+        <ul>
+            <li>Node.js >= 14.x</li>
+            <li>MySQL >= 8.0</li>
+            <li>MQTT Broker (e.g., Mosquitto)</li>
+        </ul>
+
+        <h3>Setup Steps</h3>
+        <pre>
+# 1. Install dependencies
+npm install
+
+# 2. Set up database
+mysql -u root -p < config/schema.sql
+
+# 3. Configure environment
+cp .env.example .env
+# Edit .env with your settings
+
+# 4. Start the server
+npm run dev  # Development with auto-reload
+npm start    # Production mode
+        </pre>
+
+        <h3>Testing the Setup</h3>
+        <pre>
+# 1. Publish test message
+mosquitto_pub -t "sensors/temperature/aa" -m '{
+    "devId": "A-Temp-001",
+    "tmp": 27.3,
+    "unit": "C"
+}'
+
+# 2. Check REST API
+curl http://localhost:3000/api/latest
+
+# 3. Check WebSocket
+wscat -c ws://localhost:3000
+        </pre>
+    </div>
+
+    <div class="section">
+        <h2>6. API & Integration</h2>
+
+        <h3>REST API Endpoints</h3>
+        <table>
+            <tr>
+                <th>Endpoint</th>
+                <th>Method</th>
+                <th>Description</th>
+                <th>Parameters</th>
+            </tr>
+            <tr>
+                <td>/api/latest</td>
+                <td>GET</td>
+                <td>Get all latest sensor data</td>
+                <td>None</td>
+            </tr>
+            <tr>
+                <td>/api/latest/:deviceId</td>
+                <td>GET</td>
+                <td>Get latest data for specific device</td>
+                <td>deviceId: string</td>
+            </tr>
+            <tr>
+                <td>/api/history/:deviceId</td>
+                <td>GET</td>
+                <td>Get device history</td>
+                <td>
+                    deviceId: string<br>
+                    limit: number (optional)
+                </td>
+            </tr>
+            <tr>
+                <td>/system/health</td>
+                <td>GET</td>
+                <td>System health check</td>
+                <td>None</td>
+            </tr>
+            <tr>
+                <td>/system/metrics</td>
+                <td>GET</td>
+                <td>System metrics</td>
+                <td>None</td>
+            </tr>
+        </table>
+
+        <h3>WebSocket Events</h3>
+        <table>
+            <tr>
+                <th>Event</th>
+                <th>Description</th>
+                <th>Payload</th>
+            </tr>
+            <tr>
+                <td>message</td>
+                <td>Real-time sensor update</td>
+                <td>Normalized message object</td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="section">
+        <h2>7. Performance & Scaling</h2>
+
+        <h3>Performance Features</h3>
+        <ul>
+            <li>Worker Pool for parallel processing</li>
+            <li>Write buffering for database operations</li>
+            <li>Rate limiting for API protection</li>
+            <li>Circuit breaker for service protection</li>
+            <li>Memory-aware batch processing</li>
+        </ul>
+
+        <h3>Scaling Considerations</h3>
+        <div class="mermaid">
+        flowchart TB
+            subgraph "Load Balancer"
+                LB[HAProxy/Nginx]
+            end
+            
+            subgraph "App Instances"
+                A1[App 1]
+                A2[App 2]
+                A3[App 3]
+            end
+            
+            subgraph "Message Queue"
+                MQ[Redis/RabbitMQ]
+            end
+            
+            subgraph "Database"
+                M1[(MySQL Primary)]
+                M2[(MySQL Replica 1)]
+                M3[(MySQL Replica 2)]
+            end
+            
+            LB --> A1 & A2 & A3
+            A1 & A2 & A3 --> MQ
+            MQ --> M1
+            M1 --> M2 & M3
+        </div>
+    </div>
+
+    <script>
+        mermaid.initialize({ 
+            startOnLoad: true, 
+            theme: 'default',
+            flowchart: {
+                useMaxWidth: false
+            }
+        });
+    </script>
+</body>
+</html>

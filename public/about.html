@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IoT Middleware v3 - Documentation</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            line-height: 1.6;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            color: #333;
+        }
+        h1, h2, h3 { color: #2c3e50; }
+        pre {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        .try-it {
+            background: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .try-it:hover { background: #45a049; }
+        .response {
+            margin-top: 20px;
+            display: none;
+        }
+        .mermaid {
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin: 20px 0;
+        }
+        .config-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        .config-table th, .config-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        .config-table th {
+            background-color: #f5f5f5;
+        }
+        .section {
+            margin: 40px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <h1>IoT Middleware v3</h1>
+    
+    <h2>Overview</h2>
+    <div class="section">
+        <h3>High-Performance Framework</h3>
+        <p>
+            Built for high-volume IoT data processing with:
+            <ul>
+                <li>Parallel Processing with Worker Pool</li>
+                <li>Intelligent Message Batching</li>
+                <li>Rate Limiting and Circuit Breaking</li>
+                <li>Memory-Aware Operations</li>
+            </ul>
+        </p>
+
+        <h3>Core Framework</h3>
+        <p>
+            Built on a modern, event-driven architecture with:
+            <ul>
+                <li>Central Event Bus for decoupled communication</li>
+                <li>Plugin System for extensible functionality</li>
+                <li>Message Processing Pipeline with middleware support</li>
+                <li>Dynamic module loading and configuration</li>
+            </ul>
+        </p>
+
+        <h3>MQTT Topic Format</h3>
+        <p>
+            The middleware uses a standardized topic hierarchy for MQTT messages:
+            <pre><code>&lt;category&gt;/&lt;gatewayId&gt;/&lt;type&gt;</code></pre>
+        </p>
+        <p>
+            Example topics:
+            <ul>
+                <li><code>sensors/gateway123/temperature</code> - Temperature sensor data</li>
+                <li><code>sensors/gateway123/humidity</code> - Humidity sensor data</li>
+                <li><code>devices/gateway456/status</code> - Device status updates</li>
+                <li><code>devices/gateway456/control</code> - Device control messages</li>
+            </ul>
+        </p>
+        <p>
+            Topic components:
+            <ul>
+                <li><strong>category:</strong> Either "sensors" or "devices"</li>
+                <li><strong>gatewayId:</strong> Your gateway's unique identifier</li>
+                <li><strong>type:</strong> The sensor type or message type</li>
+            </ul>
+        </p>
+
+        <h3>Resilience Features</h3>
+        <p>
+            Designed for reliability under high load:
+            <ul>
+                <li>Automatic Circuit Breaking for error prevention</li>
+                <li>Intelligent Rate Limiting for traffic control</li>
+                <li>Smart Batching for optimal performance</li>
+                <li>Resource-aware scaling</li>
+            </ul>
+        </p>
+
+        <h3>Features</h3>
+        <p>
+            This middleware service bridges MQTT-enabled IoT devices with applications by:
+            <ul>
+                <li>Supporting multiple MQTT topic subscriptions</li>
+                <li>Normalizing raw MQTT messages into a unified JSON format</li>
+                <li>Storing the latest readings in memory for fast access</li>
+                <li>Persisting historical data in MySQL with write buffering</li>
+                <li>Providing REST APIs for data access</li>
+                <li>Supporting real-time WebSocket updates</li>
+                <li>Offering HTTP callbacks with retry mechanism</li>
+            </ul>
+        </p>
+    </div>
+
+    <h2>Plugin System</h2>
+    <div class="section">
+        <p>Extend functionality through plugins:</p>
+        <pre>
+// Example plugin
+module.exports = {
+    initialize: async (eventBus) => {
+        eventBus.subscribe('message.received', 
+            async (message) => {
+                // Custom processing
+            });
+    }
+};</pre>
+    </div>
+
+    <h2>System Architecture</h2>
+    <div class="section">
+        <h3>High-Performance Architecture</h3>
+        <div class="mermaid">
+        flowchart TB
+            MQTT[MQTT Broker] --> RL[Rate Limiter]
+            RL --> MH[MQTT Handler]
+            MH --> EB{Event Bus}
+            EB --> WP[Worker Pool]
+            WP --> W1[Worker 1]
+            WP --> W2[Worker 2]
+            WP --> W3[Worker N]
+            W1 & W2 & W3 --> BM[Batch Manager]
+            BM --> DB[(Database)]
+            
+            subgraph Processing Layer
+                WP
+                W1
+                W2
+                W3
+            end
+            
+            subgraph Resilience
+                RL
+                CB[Circuit Breaker]
+            end
+            
+            P1 --> DS[Data Store]
+            P2 --> WB[Write Buffer]
+            P3 --> WS[WebSocket]
+            DS --> API[REST API]
+            WB --> DB[(MySQL)]
+            WS --> Client[Clients]
+        </div>
+
+        <h3>Message Processing Pipeline</h3>
+        <div class="mermaid">
+        flowchart LR
+            M[Message] --> MW1[Middleware 1]
+            MW1 --> MW2[Middleware 2]
+            MW2 --> MW3[Middleware 3]
+            MW3 --> R[Result]
+            
+            subgraph Pipeline
+                MW1
+                MW2
+                MW3
+            end
+        </div>
+
+        <h3>Write Buffer Process</h3>
+        <div class="mermaid">
+        flowchart LR
+            D[Data] --> WB[Write Buffer]
+            WB --> C{Check Size}
+            C -->|>= maxSize| F[Flush to DB]
+            C -->|< maxSize| W[Wait]
+            W --> T[Timer]
+            T -->|flushInterval| F
+            F --> R{Retry?}
+            R -->|Yes| F
+            R -->|No| E[Error Handler]
+        </div>
+    </div>
+
+    <h2>Event System</h2>
+    <div class="section">
+        <h3>Core Events</h3>
+        <table class="config-table">
+            <tr>
+                <th>Event</th>
+                <th>Description</th>
+                <th>Example Data</th>
+            </tr>
+            <tr>
+                <td>message.received</td>
+                <td>Raw message from MQTT broker</td>
+                <td>{topic, payload, timestamp}</td>
+            </tr>
+            <tr>
+                <td>message.processed</td>
+                <td>Processed and normalized message</td>
+                <td>{deviceId, sensorType, payload}</td>
+            </tr>
+            <tr>
+                <td>message.error</td>
+                <td>Processing error occurred</td>
+                <td>{error, message, context}</td>
+            </tr>
+            <tr>
+                <td>system.startup</td>
+                <td>System initialization</td>
+                <td>{config, timestamp}</td>
+            </tr>
+        </table>
+    </div>
+
+    <h2>Configuration</h2>
+    <div class="section">
+        <h3>System Configuration</h3>
+        <table class="config-table">
+            <tr>
+                <th>Component</th>
+                <th>Configuration</th>
+                <th>Description</th>
+            </tr>
+            <tr>
+                <td>MQTT</td>
+                <td>topics, QoS, reconnection</td>
+                <td>Multiple topic subscriptions, connection settings</td>
+            </tr>
+            <tr>
+                <td>Write Buffer</td>
+                <td>size, interval, retries</td>
+                <td>Database write optimization settings</td>
+            </tr>
+            <tr>
+                <td>Callbacks</td>
+                <td>retry limit, delay</td>
+                <td>HTTP notification retry settings</td>
+            </tr>
+            <tr>
+                <td>Server</td>
+                <td>rate limits, compression</td>
+                <td>API protection and optimization</td>
+            </tr>
+        </table>
+    </div>
+
+    <h2>API Documentation</h2>
+    
+    <h3>1. Get Latest Data (All Sensors)</h3>
+    <pre>GET /api/latest</pre>
+    <button class="try-it" onclick="tryLatest()">Try It!</button>
+    <pre id="latestResponse" class="response"></pre>
+
+    <h3>2. Get Latest Data (Single Sensor)</h3>
+    <pre>GET /api/latest/:deviceId</pre>
+    
+    <h3>3. Get Sensor History</h3>
+    <pre>GET /api/history/:deviceId?limit=50</pre>
+
+    <h2>Message Format</h2>
+    <div class="section">
+        <h3>Input Example (Raw MQTT Message)</h3>
+        <pre>
+{
+  "devId": "A-Temp-001",
+  "rackNo": "42",
+  "posU": "18",
+  "tmp": 27.3,
+  "unit": "C",
+  "time": 1695653130000
+}</pre>
+
+        <h3>Normalized Format</h3>
+        <pre>
+{
+  "deviceId": "string",        // unique device id
+  "sensorType": "string",      // e.g. "temperature"
+  "ts": "2025-09-24T08:12:23.456Z", // ISO8601 UTC timestamp
+  "seq": 12345,                // optional sequence number
+  "payload": {                 // sensor-specific data
+     "temp": 28.3,
+     "unit": "C",
+     "rackNo": "42",
+     "posU": "18"
+  },
+  "meta": {                    // metadata
+     "rawTopic": "sensors/gateway-1/temp",
+     "gatewayId": "gateway-1"
+  }
+}</pre>
+    </div>
+
+    <script>
+        // Initialize Mermaid
+        mermaid.initialize({ startOnLoad: true, theme: 'default' });
+        
+        async function tryLatest() {
+            const response = document.getElementById('latestResponse');
+            response.style.display = 'block';
+            
+            try {
+                const res = await fetch('/api/latest');
+                const data = await res.json();
+                response.textContent = JSON.stringify(data, null, 2);
+            } catch (err) {
+                response.textContent = `Error: ${err.message}`;
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+{
+  "name": "iot-middleware-v3",
+  "version": "3.0.0",
+  "description": "IoT Middleware v3 - MQTT to REST API with MySQL storage",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.0",
+    "mqtt": "^5.3.0",
+    "mysql2": "^3.9.7",
+    "dotenv": "^16.0.0",
+    "ws": "^8.5.0",
+    "node-fetch": "^2.6.7",
+    "compression": "^1.7.4",
+    "express-rate-limit": "^6.7.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  }
+}
