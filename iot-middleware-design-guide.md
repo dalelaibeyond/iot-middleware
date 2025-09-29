@@ -42,7 +42,7 @@ V1 (normalize & forward):
 [MQTT Broker] --> [Ingest workers / MQTT bridge] --> [Normalizer] --> 
     -> [HTTP notify (callbacks)] 
     -> [WS Broadcast]
-    -> [MQTT.publish() re-publish normalized topic (optional)]
+    -> [Message Relay (configurable normalized MQTT topics)]
     -> [REST-forwarding (for upper app poll)] 
 ```
 
@@ -80,8 +80,16 @@ V3 (history DB):
 
      * HTTP callbacks (Http.notifyListeners())
      * WebSocket broadcast (WS.broadcast())
-     * MQTT re-publish of normalized topic (MQTT.publish())
+     * Message Relay for normalized MQTT topics
      * Store (Latest store in V2, DB in V3)
+
+4. **Message Relay**
+
+   * Independent MQTT client for republishing normalized messages
+   * Configurable topic patterns and prefix
+   * Prevention of recursive republishing
+   * Structured topic transformation
+   * Can be enabled/disabled via configuration
 
 4. **LatestStore (V2)**
 

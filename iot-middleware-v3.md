@@ -12,11 +12,23 @@ iot-middleware-v3/
 │   └── db.js
 ├── modules/
 │   ├── mqttClient.js
+│   ├── mqttHandler.js
+│   ├── messageRelay.js
 │   ├── normalizers/
 │   │   ├── index.js
 │   │   └── temperatureNormalizer.js
 │   ├── dataStore.js
-│   └── dbStore.js
+│   ├── dbStore.js
+│   ├── writeBuffer.js
+│   ├── wsServer.js
+│   ├── core/
+│   │   ├── eventBus.js
+│   │   ├── messageProcessor.js
+│   │   ├── pluginManager.js
+│   │   ├── resilience.js
+│   │   └── workerPool.js
+│   └── plugins/
+│       └── messageEnrichment.js
 ├── routes/
 │   ├── api.js
 │   └── index.js
@@ -52,6 +64,54 @@ iot-middleware-v3/
 
 ---
 
+# 📄 `modules/messageRelay.js`
+
+```js
+const mqtt = require("mqtt");
+const logger = require("../utils/logger");
+const config = require("../config/config.json");
+
+class MessageRelay {
+    constructor(options = {}) {
+        this.config = config.messageRelay;
+        this.enabled = this.config.enabled;
+        this.topicPrefix = this.config.topicPrefix;
+        this.patterns = this.config.patterns;
+        
+        if (this.enabled) {
+            this.connect(options.mqttUrl);
+        }
+    }
+
+    generateNewTopic(originalTopic) {
+        if (originalTopic.includes(`/${this.topicPrefix}/`)) {
+            return null; // Prevent recursion
+        }
+
+        const parts = originalTopic.split('/');
+        const [category, gatewayId, type] = parts;
+        
+        return this.patterns[category]
+            ?.replace('${prefix}', this.topicPrefix)
+            ?.replace('${gatewayId}', gatewayId)
+            ?.replace('${type}', type);
+    }
+
+    publishNormalizedMessage(originalTopic, message) {
+        if (!this.enabled) return;
+        
+        const newTopic = this.generateNewTopic(originalTopic);
+        if (newTopic) {
+            this.mqttClient.publish(newTopic, JSON.stringify(message));
+        }
+    }
+}
+
+module.exports = MessageRelay;
+```
+
+---
+
 # 📄 `server.js`
 
 ```js
@@ -59,7 +119,7 @@ const express = require("express");
 const path = require("path");
 const apiRoutes = require("./routes/api");
 const indexRoutes = require("./routes/index");
-require("./modules/mqttClient"); // Start MQTT client
+const MQTTHandler = require("./modules/mqttHandler");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -81,22 +141,71 @@ app.listen(PORT, () => {
 
 ---
 
+# 📄 `config/config.json`
+
+```json
+{
+  "mqtt": {
+    "topics": ["sensors/#", "devices/#"],
+    "options": {
+      "qos": 1,
+      "reconnectPeriod": 5000,
+      "keepalive": 60
+    }
+  },
+  "messageRelay": {
+    "enabled": true,
+    "topicPrefix": "new",
+    "patterns": {
+      "sensors": "sensors/${prefix}/${gatewayId}/${type}",
+      "devices": "devices/${prefix}/${gatewayId}/${type}"
+    }
+  },
+  "database": {
+    "enabled": true,
+    "connectionPool": {
+      "waitForConnections": true,
+      "connectionLimit": 10,
+      "queueLimit": 0
+    }
+  }
+}
+```
+
 # 📄 `config/db.js`
 
 ```js
 const mysql = require("mysql2/promise");
+const config = require("./config.json");
+const logger = require("../utils/logger");
 
-const pool = mysql.createPool({
-  host: process.env.DB_HOST || "localhost",
-  user: process.env.DB_USER || "root",
-  password: process.env.DB_PASS || "",
-  database: process.env.DB_NAME || "iot_middleware",
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0
-});
+let pool = null;
 
-module.exports = pool;
+if (config.database.enabled) {
+  pool = mysql.createPool({
+    host: process.env.DB_HOST || "localhost",
+    user: process.env.DB_USER || "root",
+    password: process.env.DB_PASS || "",
+    database: process.env.DB_NAME || "iot_middleware",
+    ...config.database.connectionPool
+  });
+
+  pool.getConnection()
+    .then(connection => {
+      logger.info("Database connection established successfully");
+      connection.release();
+    })
+    .catch(err => {
+      logger.error("Failed to connect to database:", err);
+    });
+} else {
+  logger.info("Database storage is disabled in configuration");
+}
+
+module.exports = {
+  pool,
+  isEnabled: config.database.enabled
+};
 ```
 
 ---
