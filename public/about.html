@@ -104,6 +104,55 @@
                 <li><code>devices/gateway456/control</code> - Device control messages</li>
             </ul>
         </p>
+
+        <h3>Message Relay System</h3>
+        <p>
+            The middleware includes a message relay system that republishes normalized messages to new topics:
+        </p>
+        <p>
+            Relay topic format:
+            <pre><code>&lt;category&gt;/&lt;prefix&gt;/&lt;gatewayId&gt;/&lt;type&gt;</code></pre>
+        </p>
+        <p>
+            For example:
+            <ul>
+                <li>Original: <code>sensors/gateway123/temperature</code></li>
+                <li>Relayed: <code>sensors/new/gateway123/temperature</code></li>
+            </ul>
+        </p>
+        <p>
+            Configuration in config.json:
+            <pre><code>{
+    "messageRelay": {
+        "enabled": true,
+        "topicPrefix": "new",
+        "patterns": {
+            "sensors": "sensors/${prefix}/${gatewayId}/${type}",
+            "devices": "devices/${prefix}/${gatewayId}/${type}"
+        }
+    }
+}</code></pre>
+        </p>
+        <p>
+            Benefits:
+            <ul>
+                <li>Separate normalized data stream</li>
+                <li>Easy integration with other systems</li>
+                <li>Configurable topic patterns</li>
+                <li>Can be enabled/disabled as needed</li>
+            </ul>
+        </p>
+
+        <h3>Core Framework</h3>
+        <p>
+            Built on a modern, event-driven architecture with:
+            <ul>
+                <li><code>sensors/gateway123/temperature</code> - Temperature sensor data</li>
+                <li><code>sensors/gateway123/humidity</code> - Humidity sensor data</li>
+                <li><code>devices/gateway456/status</code> - Device status updates</li>
+                <li><code>devices/gateway456/control</code> - Device control messages</li>
+            </ul>
+        </p>
         <p>
             Topic components:
             <ul>

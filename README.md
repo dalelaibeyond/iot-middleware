@@ -53,6 +53,34 @@ Where:
 - `<gatewayId>` is your gateway's unique identifier
 - `<type>` is the sensor type or message type
 
+### Message Relay Feature
+The middleware can automatically republish normalized messages to new topics for easier integration with other systems.
+
+#### Relay Topic Format
+When enabled, normalized messages are republished with the following topic structure:
+```
+<category>/<prefix>/<gatewayId>/<type>
+```
+
+Example:
+- Original topic: `sensors/gateway123/temperature`
+- Relay topic: `sensors/new/gateway123/temperature`
+
+#### Configuration
+Enable and configure message relay in `config.json`:
+```json
+{
+    "messageRelay": {
+        "enabled": true,
+        "topicPrefix": "new",
+        "patterns": {
+            "sensors": "sensors/${prefix}/${gatewayId}/${type}",
+            "devices": "devices/${prefix}/${gatewayId}/${type}"
+        }
+    }
+}
+```
+
 - **Efficient Data Storage**
   - Write buffer with batch processing
   - MySQL historical data storage

@@ -34,6 +34,14 @@
         },
         "format": "[{timestamp}] {level} {message}"
     },
+    "messageRelay": {
+        "enabled": true,
+        "topicPrefix": "new",
+        "patterns": {
+            "sensors": "sensors/${prefix}/${gatewayId}/${type}",
+            "devices": "devices/${prefix}/${gatewayId}/${type}"
+        }
+    },
     "database": {
         "enabled": false,
         "connectionPool": {

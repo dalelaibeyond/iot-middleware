@@ -6,6 +6,7 @@ const MessageProcessor = require("./core/messageProcessor");
 const WorkerPool = require("./core/workerPool");
 const { CircuitBreaker, RateLimiter } = require("./core/resilience");
 const BatchManager = require("./core/batchManager");
+const MessageRelay = require("./messageRelay");
 
 class MQTTHandler {
     constructor(options = {}) {
@@ -47,6 +48,9 @@ class MQTTHandler {
         // Initialize message processor
         this.messageProcessor = new MessageProcessor();
         this.initializeMessagePipeline();
+
+        // Initialize message relay
+        this.messageRelay = new MessageRelay({ mqttUrl: this.options.url });
 
         this.client = null;
         this.isConnected = false;
@@ -93,6 +97,8 @@ class MQTTHandler {
             const normalized = normalize(topic, message, meta);
             if (normalized) {
                 await this.processNormalizedMessage(normalized);
+                // Relay the normalized message
+                this.messageRelay.publishNormalizedMessage(topic, normalized);
             } else {
                 logger.error(`Failed to normalize message for topic ${topic}`);
             }
