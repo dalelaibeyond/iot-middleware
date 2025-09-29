@@ -33,5 +33,13 @@
             "filename": "app.log"
         },
         "format": "[{timestamp}] {level} {message}"
+    },
+    "database": {
+        "enabled": false,
+        "connectionPool": {
+            "waitForConnections": true,
+            "connectionLimit": 10,
+            "queueLimit": 0
+        }
     }
 }

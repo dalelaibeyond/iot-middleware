@@ -1,4 +1,4 @@
-const pool = require("../config/db");
+const { pool, isEnabled } = require("../config/db");
 const logger = require("../utils/logger");
 
 function formatTimestamp(isoTimestamp) {
@@ -6,6 +6,12 @@ function formatTimestamp(isoTimestamp) {
 }
 
 async function saveHistory(data) {
+  // If database is disabled, return immediately
+  if (!isEnabled) {
+    logger.debug("Database storage is disabled, skipping save operation");
+    return true;
+  }
+
   const { deviceId, sensorType, ts, payload, meta } = data;
   
   try {
@@ -35,6 +41,12 @@ async function saveHistory(data) {
 }
 
 async function getHistory(deviceId, limit = 50) {
+  // If database is disabled, return empty array
+  if (!isEnabled) {
+    logger.debug("Database storage is disabled, returning empty history");
+    return [];
+  }
+
   try {
     const [rows] = await pool.query(
       "SELECT * FROM sensor_data WHERE device_id = ? ORDER BY timestamp DESC LIMIT ?",
@@ -78,6 +90,12 @@ async function getHistory(deviceId, limit = 50) {
 async function saveBatch(dataArray) {
   if (!Array.isArray(dataArray) || dataArray.length === 0) {
     return;
+  }
+
+  // If database is disabled, return successfully without doing anything
+  if (!isEnabled) {
+    logger.debug(`Database storage is disabled, skipping batch save of ${dataArray.length} records`);
+    return { affectedRows: dataArray.length };
   }
 
   try {
