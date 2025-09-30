@@ -6,6 +6,14 @@ class MessageProcessor {
         this.middlewares = [];
     }
 
+    async initialize() {
+        // No initialization needed for message processor
+    }
+
+    async shutdown() {
+        // No shutdown needed for message processor
+    }
+
     /**
      * Add middleware to the processing pipeline
      * @param {Function} middleware - Middleware function
@@ -21,6 +29,7 @@ class MessageProcessor {
      * @param {Object} context - Processing context
      */
     async process(message, context = {}) {
+        logger.debug('MessageProcessor processing message', { deviceId: message.devId || message.deviceId });
         let index = 0;
         const stack = [...this.middlewares];
 
@@ -33,7 +42,8 @@ class MessageProcessor {
 
             const middleware = stack[index++];
             if (!middleware) {
-                eventBus.publish('message.processed', { message, context });
+                logger.debug('All middlewares completed, emitting message.processed');
+                eventBus.publish('message.processed', message);
                 return;
             }
 

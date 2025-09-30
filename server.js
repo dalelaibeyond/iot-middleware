@@ -8,93 +8,75 @@ const rateLimit = require("express-rate-limit");
 // Load environment variables first
 dotenv.config();
 
+// Import core modules
+const logger = require("./utils/logger");
+const Application = require("./modules/Application");
+
 // Import routes
 const apiRoutes = require("./routes/api");
 const indexRoutes = require("./routes/index");
 const systemRoutes = require("./routes/system");
 
-// Import modules
-const logger = require("./utils/logger");
-const WSServer = require("./modules/wsServer");
-const WriteBuffer = require("./modules/writeBuffer");
-const dbStore = require("./modules/dbStore");
-const dataStore = require("./modules/dataStore");
-const callbackManager = require("./modules/callbackManager");
+async function startServer() {
+    try {
+        // Create Express app
+        const app = express();
+        const server = http.createServer(app);
+        const PORT = process.env.PORT || 3000;
 
-// Create Express app
-const app = express();
-const server = http.createServer(app);
-const PORT = process.env.PORT || 3000;
+        // Load configuration
+        const config = require('./config/config.json');
 
-// Initialize WebSocket server
-const wsServer = new WSServer(server);
-app.set('wsServer', wsServer);
+        // Rate limiting
+        const limiter = rateLimit({
+            windowMs: config.server.rateLimit.windowMs,
+            max: config.server.rateLimit.maxRequests
+        });
 
-// Initialize Write Buffer
-const writeBuffer = new WriteBuffer(dbStore, {
-    maxSize: process.env.WRITE_BUFFER_SIZE || 1000,
-    flushInterval: process.env.WRITE_BUFFER_INTERVAL || 5000
-});
-app.set('writeBuffer', writeBuffer);
+        // Initialize application
+        const application = new Application({
+            server: server,
+            config: config
+        });
+        await application.initialize();
 
-// Load configuration
-const config = require('./config/config.json');
+        // Middleware
+        app.use(compression(config.server.compression));
+        app.use(limiter);
+        app.use(express.json());
+        app.use(express.static(path.join(__dirname, "public")));
 
-// Rate limiting
-const limiter = rateLimit({
-    windowMs: config.server.rateLimit.windowMs,
-    max: config.server.rateLimit.maxRequests
-});
+        // Routes
+        app.use("/", indexRoutes);
+        app.use("/api", apiRoutes);
+        app.use("/system", systemRoutes);
 
-// Middleware
-app.use(compression(config.server.compression)); // Enable compression with config
-app.use(express.json());
-app.use(limiter); // Apply rate limiting
+        // Handle graceful shutdown
+        process.on('SIGTERM', async () => {
+            logger.info('SIGTERM received. Starting graceful shutdown...');
+            await application.shutdown();
+            process.exit(0);
+        });
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-    logger.error('Unhandled error:', err);
-    res.status(500).json({ error: 'Internal server error' });
-});
+        process.on('SIGINT', async () => {
+            logger.info('SIGINT received. Starting graceful shutdown...');
+            await application.shutdown();
+            process.exit(0);
+        });
 
-// Static files
-app.use(express.static(path.join(__dirname, "public")));
+        // Start server
+        server.listen(PORT, () => {
+            logger.info(`IoT Middleware v3 running at http://localhost:${PORT}`);
+        });
 
-// Routes
-app.use("/", indexRoutes);
-app.use("/api", apiRoutes);
-app.use("/system", systemRoutes);
+    } catch (error) {
+        logger.error('Failed to start server:', error);
+        process.exit(1);
+    }
+}
 
-// Initialize MQTT client with all dependencies
-const createMQTTClient = require("./modules/mqttClient");
-const mqttHandler = createMQTTClient({
-    dataStore,
-    writeBuffer,
-    wsServer,
-    callbackManager
-});
-
-// Graceful shutdown
-process.on('SIGTERM', async () => {
-    logger.info('SIGTERM received. Starting graceful shutdown...');
-    
-    // Close MQTT connection
-    mqttClient.end();
-    
-    // Flush write buffer
-    await writeBuffer.shutdown();
-    
-    // Close WebSocket server
-    server.close(() => {
-        logger.info('Server shut down complete');
-        process.exit(0);
-    });
-});
-
-// Start server
-server.listen(PORT, () => {
-    logger.info(`IoT Middleware v3 running at http://localhost:${PORT}`);
-    logger.info('WebSocket server enabled');
-    logger.info('Write buffer initialized');
-    logger.info('Callback system ready');
+// Start the server
+startServer().catch(error => {
+    logger.error('Unhandled error during startup:', error);
+    process.exit(1);
 });

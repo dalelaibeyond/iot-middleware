@@ -5,7 +5,16 @@
             "qos": 1,
             "reconnectPeriod": 5000,
             "keepalive": 60
+        },
+        "patterns": {
+            "sensors": "sensors/+/+",
+            "devices": "devices/+/+"
         }
+    },
+    "cache": {
+        "enabled": true,
+        "maxSize": 10000,
+        "ttl": 3600000
     },
     "server": {
         "rateLimit": {
@@ -43,7 +52,7 @@
         }
     },
     "database": {
-        "enabled": false,
+        "enabled": true,
         "connectionPool": {
             "waitForConnections": true,
             "connectionLimit": 10,

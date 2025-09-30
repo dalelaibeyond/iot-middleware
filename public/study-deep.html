@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IoT Middleware v3 - Deep Study Guide</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({ startOnLoad: true, theme: 'default' });
+    </script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
+        h1, h2, h3 { color: #333; }
+        h1 { border-bottom: 2px solid #333; padding-bottom: 10px; }
+        h2 { margin-top: 30px; }
+        h3 { margin-top: 20px; }
+        .code { background: #f4f4f4; padding: 10px; border-left: 4px solid #ccc; margin: 10px 0; }
+        .highlight { background: #ffff99; padding: 2px 4px; }
+        ul { margin-left: 20px; }
+        .flow { background: #e8f4fd; padding: 15px; border-radius: 5px; margin: 10px 0; }
+        .mermaid { text-align: center; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <h1>IoT Middleware v3 - Deep Study Guide</h1>
+
+    <h2>Project Overview</h2>
+    <p>This is an advanced high-performance IoT middleware designed for processing thousands of concurrent sensor messages. It acts as a bridge between MQTT-enabled devices and applications, providing real-time data processing, storage, and distribution.</p>
+
+    <h2>Project Structure</h2>
+    <div class="mermaid">
+        graph TD
+            A[server.js] --> B[Application.js]
+            B --> C[modules/]
+            C --> D[core/]
+            C --> E[mqtt/]
+            C --> F[database/]
+            C --> G[storage/]
+            C --> H[api/]
+            C --> I[normalizers/]
+            C --> J[plugins/]
+            B --> K[routes/]
+            B --> L[utils/]
+            B --> M[config/]
+            B --> N[public/]
+
+            D --> D1[BaseComponent.js]
+            D --> D2[eventBus.js]
+            D --> D3[messageProcessor.js]
+            D --> D4[pluginManager.js]
+
+            E --> E1[MQTTClient.js]
+            E --> E2[TopicManager.js]
+            E --> E3[messageRelay.js]
+
+            F --> F1[DatabaseManager.js]
+            F --> F2[dbStore.js]
+
+            G --> G1[CacheManager.js]
+            G --> G2[dataStore.js]
+            G --> G3[WriteBuffer.js]
+
+            H --> H1[WebSocketServer.js]
+            H --> H2[CallbackManager.js]
+
+            I --> I1[index.js]
+            I --> I2[temperatureNormalizer.js]
+
+            K --> K1[api.js]
+            K --> K2[index.js]
+            K --> K3[system.js]
+
+            L --> L1[logger.js]
+            M --> M1[config.json]
+            M --> M2[ConfigManager.js]
+    </div>
+
+    <div class="code">
+├── config/                 # Configuration files<br>
+│   ├── config.json        # System configuration<br>
+│   ├── ConfigManager.js   # Configuration management<br>
+│   ├── db.js             # Database configuration<br>
+│   └── schema.sql        # Database schema<br>
+├── modules/               # Core modules<br>
+│   ├── core/             # Framework components<br>
+│   │   ├── BaseComponent.js<br>
+│   │   ├── eventBus.js<br>
+│   │   ├── messageProcessor.js<br>
+│   │   ├── pluginManager.js<br>
+│   │   ├── resilience.js<br>
+│   │   ├── ResilienceManager.js<br>
+│   │   ├── workerPool.js<br>
+│   │   └── batchManager.js<br>
+│   ├── mqtt/             # MQTT handling<br>
+│   │   ├── MQTTClient.js<br>
+│   │   ├── TopicManager.js<br>
+│   │   ├── mqttHandler.js<br>
+│   │   └── messageRelay.js<br>
+│   ├── database/         # Data persistence<br>
+│   │   ├── DatabaseManager.js<br>
+│   │   ├── dbStore.js<br>
+│   │   └── QueryBuilder.js<br>
+│   ├── storage/          # Data storage<br>
+│   │   ├── CacheManager.js<br>
+│   │   ├── dataStore.js<br>
+│   │   └── WriteBuffer.js<br>
+│   ├── api/              # External interfaces<br>
+│   │   ├── WebSocketServer.js<br>
+│   │   └── CallbackManager.js<br>
+│   ├── normalizers/      # Message normalization<br>
+│   │   ├── index.js<br>
+│   │   └── temperatureNormalizer.js<br>
+│   └── plugins/          # Extensible plugins<br>
+│       └── messageEnrichment.js<br>
+├── routes/               # HTTP routes<br>
+│   ├── api.js<br>
+│   ├── index.js<br>
+│   └── system.js<br>
+├── utils/                # Utilities<br>
+│   ├── logger.js<br>
+│   └── loggerToFile.js<br>
+├── public/               # Static files<br>
+├── server.js             # Main entry point<br>
+└── package.json          # Dependencies
+    </div>
+
+    <h2>Module Dependencies and Relationships</h2>
+
+    <div class="mermaid">
+        graph TD
+            subgraph "Core Framework"
+                A[Application] --> B[BaseComponent]
+                A --> C[eventBus]
+                A --> D[MessageProcessor]
+                D --> C
+            end
+
+            subgraph "MQTT Layer"
+                E[MQTTClient] --> F[TopicManager]
+                E --> G[messageRelay]
+                F --> C
+            end
+
+            subgraph "Processing Layer"
+                D --> H[Normalizers]
+                H --> I[temperatureNormalizer]
+            end
+
+            subgraph "Storage Layer"
+                J[CacheManager] --> C
+                K[WriteBuffer] --> L[DatabaseManager]
+                M[dataStore] --> C
+                L --> N[MySQL]
+            end
+
+            subgraph "API Layer"
+                O[WebSocketServer] --> P[HTTP Server]
+                Q[CallbackManager] --> C
+                R[Routes] --> S[Storage Modules]
+            end
+
+            A --> E
+            A --> J
+            A --> K
+            A --> M
+            A --> O
+            A --> Q
+
+            C -.->|events| J
+            C -.->|events| K
+            C -.->|events| M
+            C -.->|events| O
+            C -.->|events| Q
+
+            style A fill:#e1f5fe
+            style C fill:#fff3e0
+            style D fill:#f3e5f5
+    </div>
+
+    <h3>Core Architecture</h3>
+    <ul>
+        <li><strong>BaseComponent</strong>: Base class for all components, provides config, logger, initialize/shutdown lifecycle</li>
+        <li><strong>eventBus</strong>: Central pub/sub system for decoupled communication between modules</li>
+        <li><strong>Application</strong>: Main orchestrator that initializes and manages all components</li>
+    </ul>
+
+    <h3>Data Flow Dependencies</h3>
+    <div class="flow">
+        <strong>MQTT → Application → MessageProcessor → eventBus → Storage/API</strong><br><br>
+        <ul>
+            <li>MQTTClient depends on TopicManager for topic validation</li>
+            <li>Application depends on MessageProcessor for message processing</li>
+            <li>MessageProcessor uses normalizers for data transformation</li>
+            <li>All storage components (CacheManager, WriteBuffer, dataStore) listen to eventBus</li>
+            <li>API components (WebSocketServer, CallbackManager) broadcast processed messages</li>
+        </ul>
+    </div>
+
+    <h3>Storage Layer Dependencies</h3>
+    <ul>
+        <li><strong>WriteBuffer</strong> depends on <strong>DatabaseManager</strong> for batch writes</li>
+        <li><strong>CacheManager</strong> provides fast access to latest data</li>
+        <li><strong>dataStore</strong> maintains in-memory history with expiration</li>
+        <li><strong>DatabaseManager</strong> uses MySQL connection pool for persistence</li>
+    </ul>
+
+    <h3>API Layer Dependencies</h3>
+    <ul>
+        <li><strong>WebSocketServer</strong> depends on HTTP server for WebSocket upgrade</li>
+        <li><strong>CallbackManager</strong> uses fetch for HTTP callbacks</li>
+        <li>Routes depend on storage modules for data retrieval</li>
+    </ul>
+
+    <h2>Main Business Logic</h2>
+
+    <h3>Message Processing Pipeline</h3>
+    <p>The core business logic revolves around processing MQTT messages through a middleware pipeline:</p>
+    <ol>
+        <li><strong>Message Reception</strong>: MQTTClient receives messages from subscribed topics</li>
+        <li><strong>Topic Validation</strong>: TopicManager validates topic format (category/gatewayId/type)</li>
+        <li><strong>Message Normalization</strong>: Normalizers transform raw sensor data to standardized format</li>
+        <li><strong>Event Distribution</strong>: Processed messages are published via eventBus</li>
+        <li><strong>Data Storage</strong>: Messages are cached, buffered for batch writes, and stored in memory</li>
+        <li><strong>Real-time Distribution</strong>: WebSocket broadcasts and HTTP callbacks notify subscribers</li>
+    </ol>
+
+    <h3>Resilience Patterns</h3>
+    <ul>
+        <li><strong>Circuit Breaker</strong>: Prevents cascading failures in external services</li>
+        <li><strong>Rate Limiting</strong>: Protects against API abuse</li>
+        <li><strong>Write Buffering</strong>: Batches database writes for performance</li>
+        <li><strong>Worker Pool</strong>: Parallel processing with health monitoring</li>
+    </ul>
+
+    <h3>Data Management</h3>
+    <ul>
+        <li><strong>Multi-tier Storage</strong>: Cache → Memory → Database</li>
+        <li><strong>Batch Processing</strong>: Efficient database writes with retry logic</li>
+        <li><strong>Data Expiration</strong>: Automatic cleanup of old in-memory data</li>
+        <li><strong>Query Optimization</strong>: Indexed database queries for historical data</li>
+    </ul>
+
+    <h2>Process of Handling a Message from the Sensor</h2>
+
+    <h3>End-to-End Message Flow Sequence</h3>
+    <div class="mermaid">
+        sequenceDiagram
+            participant S as Sensor
+            participant M as MQTT Broker
+            participant MC as MQTTClient
+            participant A as Application
+            participant TM as TopicManager
+            participant MP as MessageProcessor
+            participant N as Normalizer
+            participant EB as eventBus
+            participant CM as CacheManager
+            participant WB as WriteBuffer
+            participant DS as dataStore
+            participant DB as DatabaseManager
+            participant WS as WebSocketServer
+            participant CB as CallbackManager
+
+            S->>M: Publish MQTT message
+            M->>MC: Message received
+            MC->>A: handleMessage(topic, payload)
+            A->>TM: validateTopic(topic)
+            TM-->>A: validation result
+            A->>MP: process(payload, context)
+            MP->>N: normalize message
+            N-->>MP: normalized message
+            MP->>EB: emit 'message.processed'
+            EB->>CM: update cache
+            EB->>WB: push to buffer
+            EB->>DS: store in memory
+            EB->>WS: broadcast to clients
+            EB->>CB: send HTTP callbacks
+
+            WB->>WB: check buffer size
+            alt buffer full or timeout
+                WB->>DB: flush batch
+                DB->>DB: execute batch INSERT
+            end
+    </div>
+
+    <h3>End-to-End Message Flow</h3>
+    <div class="flow">
+        <h4>Phase 1: MQTT Message Reception</h4>
+        <ol>
+            <li>Sensor publishes MQTT message to topic: <code>sensors/gateway123/temperature</code></li>
+            <li>MQTTClient receives message via subscribed wildcard topic <code>sensors/#</code></li>
+            <li>MQTTClient calls <code>Application.handleMessage(topic, message)</code></li>
+        </ol>
+
+        <h4>Phase 2: Message Validation and Parsing</h4>
+        <ol>
+            <li>TopicManager validates topic format using regex patterns</li>
+            <li>Message payload is parsed from JSON string</li>
+            <li>Topic components are extracted: category="sensors", gatewayId="gateway123", type="temperature"</li>
+        </ol>
+
+        <h4>Phase 3: Message Processing</h4>
+        <ol>
+            <li>MessageProcessor processes message through middleware pipeline</li>
+            <li>Temperature normalizer transforms raw data:
+                <div class="code">
+Input: {"devId":"A-Temp-001","tmp":27.3,"unit":"C","time":1695653130000}<br>
+Output: {"deviceId":"A-Temp-001","sensorType":"temperature","ts":"2023-09-25T12:05:30.000Z","payload":{"temp":27.3,"unit":"C"}}
+                </div>
+            </li>
+            <li>MessageProcessor emits <code>message.processed</code> event</li>
+        </ol>
+
+        <h4>Phase 4: Data Storage and Caching</h4>
+        <ol>
+            <li>CacheManager updates in-memory cache with latest data</li>
+            <li>WriteBuffer adds message to batch queue</li>
+            <li>dataStore stores message in memory with timestamp</li>
+            <li>WriteBuffer periodically flushes batches to DatabaseManager</li>
+            <li>DatabaseManager executes batch INSERT into sensor_data table</li>
+        </ol>
+
+        <h4>Phase 5: Real-time Distribution</h4>
+        <ol>
+            <li>WebSocketServer broadcasts message to all connected clients</li>
+            <li>CallbackManager sends HTTP POST to registered callback URLs</li>
+            <li>MessageRelay republishes to new topics if enabled</li>
+        </ol>
+    </div>
+
+    <h3>Example Message Transformation</h3>
+    <div class="code">
+<strong>Raw MQTT Message:</strong><br>
+Topic: sensors/temperature/aa<br>
+Payload: {<br>
+  "devId": "A-Temp-001",<br>
+  "rackNo": "42",<br>
+  "posU": "18",<br>
+  "tmp": 27.3,<br>
+  "unit": "C",<br>
+  "time": 1695653130000<br>
+}<br><br>
+<strong>Normalized Message:</strong><br>
+{<br>
+  "deviceId": "A-Temp-001",<br>
+  "sensorType": "temperature",<br>
+  "ts": "2023-09-25T12:05:30.000Z",<br>
+  "payload": {<br>
+    "temp": 27.3,<br>
+    "unit": "C",<br>
+    "rackNo": "42",<br>
+    "posU": "18"<br>
+  },<br>
+  "meta": {<br>
+    "rawTopic": "sensors/temperature/aa",<br>
+    "gatewayId": "temperature"<br>
+  }<br>
+}
+    </div>
+
+    <h3>Performance Optimizations</h3>
+    <ul>
+        <li><strong>Batch Database Writes</strong>: WriteBuffer accumulates messages and flushes in batches</li>
+        <li><strong>Connection Pooling</strong>: MySQL connection pool for efficient database access</li>
+        <li><strong>In-Memory Caching</strong>: CacheManager provides sub-millisecond access to latest data</li>
+        <li><strong>Event-Driven Architecture</strong>: Decoupled components communicate via eventBus</li>
+        <li><strong>Worker Threads</strong>: Parallel message processing with health monitoring</li>
+    </ul>
+
+    <h3>Error Handling and Resilience</h3>
+    <ul>
+        <li><strong>Retry Logic</strong>: Failed database writes are retried with exponential backoff</li>
+        <li><strong>Circuit Breakers</strong>: Prevent cascading failures in external services</li>
+        <li><strong>Graceful Degradation</strong>: System continues operating with reduced functionality</li>
+        <li><strong>Health Monitoring</strong>: System metrics and health checks for operational visibility</li>
+    </ul>
+
+    <h2>Configuration and Deployment</h2>
+    <p>The system uses a two-tier configuration system with environment variables and JSON config files. It supports both development and production modes with appropriate logging and monitoring features.</p>
+
+    <p>This middleware provides a robust, scalable solution for IoT data processing with high throughput and low latency requirements.</p>
+</body>
+</html>

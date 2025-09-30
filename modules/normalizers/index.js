@@ -1,4 +1,5 @@
 const temperatureNormalizer = require("./temperatureNormalizer");
+const logger = require("../../utils/logger");
 
 function normalize(topic, message, meta = {}) {
   try {
@@ -22,7 +23,7 @@ function normalize(topic, message, meta = {}) {
       }
     };
   } catch (err) {
-    console.error("Normalization failed:", err.message);
+    logger.error("Normalization failed:", err.message);
     return null;
   }
 }
