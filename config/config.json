@@ -32,6 +32,7 @@
         "maxRetries": 3
     },
     "callbacks": {
+        "enabled": false,
         "retryLimit": 3,
         "retryDelay": 1000
     },

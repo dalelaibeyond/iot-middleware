@@ -1,5 +1,6 @@
 const BaseComponent = require('../core/BaseComponent');
 const eventBus = require('../core/eventBus');
+const fetch = require('node-fetch');
 
 class CallbackManager extends BaseComponent {
     constructor(options = {}) {

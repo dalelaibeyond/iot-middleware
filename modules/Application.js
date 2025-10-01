@@ -7,6 +7,8 @@ const DatabaseManager = require('./database/DatabaseManager');
 const WriteBuffer = require('./storage/WriteBuffer');
 const CacheManager = require('./storage/CacheManager');
 const MessageRelay = require('./mqtt/messageRelay');
+const WebSocketServer = require('./api/WebSocketServer');
+const CallbackManager = require('./api/CallbackManager');
 const dataStore = require('./storage/dataStore');
 const eventBus = require('./core/eventBus');
 const normalizeTemperature = require('./normalizers/temperatureNormalizer');
@@ -82,6 +84,20 @@ class Application extends BaseComponent {
             await messageRelay.initialize();
             this.components.set('messageRelay', messageRelay);
             this.logger.info('Message relay enabled');
+        }
+
+        // WebSocket Server
+        const wsServer = new WebSocketServer({ server: this.options.server });
+        await wsServer.initialize();
+        this.components.set('wsServer', wsServer);
+        this.logger.info('WebSocket server initialized');
+
+        // Callback Manager (if enabled)
+        if (configManager.callbacks && configManager.callbacks.enabled) {
+            const callbackManager = new CallbackManager();
+            await callbackManager.initialize();
+            this.components.set('callbackManager', callbackManager);
+            this.logger.info('Callback manager enabled');
         }
 
         // Subscribe to configured topics

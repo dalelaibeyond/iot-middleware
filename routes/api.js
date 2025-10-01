@@ -35,6 +35,7 @@ router.get("/debug", (req, res) => {
 });
 
 // Test endpoint to inject sample data
+/*
 router.post("/test-data", (req, res) => {
   const sampleMessages = [
     { deviceId: "sensor1", temperature: 25.5, humidity: 60 },
@@ -48,6 +49,7 @@ router.post("/test-data", (req, res) => {
 
   res.json({ message: "Sample data injected", count: sampleMessages.length });
 });
+*/
 
 // Get all latest data
 router.get("/latest", (req, res) => {

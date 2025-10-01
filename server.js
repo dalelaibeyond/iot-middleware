@@ -40,6 +40,11 @@ async function startServer() {
         });
         await application.initialize();
 
+        // Register components with Express app for access in routes
+        app.set('wsServer', application.components.get('wsServer'));
+        app.set('writeBuffer', application.components.get('writeBuffer'));
+        app.set('application', application);
+
         // Middleware
         app.use(compression(config.server.compression));
         app.use(limiter);

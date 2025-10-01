@@ -1,6 +1,6 @@
 const WebSocket = require('ws');
 const BaseComponent = require('../core/BaseComponent');
-const eventBus = require('../core/EventBus');
+const eventBus = require('../core/eventBus');
 
 class WebSocketServer extends BaseComponent {
     constructor(options = {}) {
@@ -54,6 +54,10 @@ class WebSocketServer extends BaseComponent {
         return {
             connectedClients: this.clients.size
         };
+    }
+
+    getConnectedClientsCount() {
+        return this.clients.size;
     }
 
     shutdown() {

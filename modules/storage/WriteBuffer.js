@@ -75,6 +75,10 @@ class WriteBuffer extends BaseComponent {
         };
     }
 
+    getBufferSize() {
+        return this.buffer.length;
+    }
+
     shutdown() {
         if (this.timer) {
             clearInterval(this.timer);
