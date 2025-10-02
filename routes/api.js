@@ -5,29 +5,20 @@ const configManager = require("../config/ConfigManager");
 
 const router = express.Router();
 
-// Lazy load DatabaseManager only if needed
-let DatabaseManager;
-let dbManager;
-
-async function getDbManager() {
-  if (!configManager.database.enabled) {
-    return null;
+// Get DatabaseManager from the app instance if available
+function getDbManager(req) {
+  const app = req.app.get("application");
+  if (app && app.components) {
+    return app.components.get("database");
   }
-  
-  if (!dbManager) {
-    DatabaseManager = require("../modules/database/DatabaseManager");
-    dbManager = new DatabaseManager();
-    await dbManager.initialize();
-  }
-  
-  return dbManager;
+  return null;
 }
 
 // Debug endpoint to check dataStore contents
 router.get("/debug", (req, res) => {
   const allDevices = dataStore.getAllDevices();
   const result = {};
-  allDevices.forEach(deviceId => {
+  allDevices.forEach((deviceId) => {
     const data = dataStore.getDeviceData(deviceId);
     result[deviceId] = data;
   });
@@ -55,7 +46,7 @@ router.post("/test-data", (req, res) => {
 router.get("/latest", (req, res) => {
   const allDevices = dataStore.getAllDevices();
   const result = {};
-  allDevices.forEach(deviceId => {
+  allDevices.forEach((deviceId) => {
     const data = dataStore.getDeviceData(deviceId);
     if (data.length > 0) {
       result[deviceId] = data[data.length - 1].data; // Latest data
@@ -77,10 +68,10 @@ router.get("/latest/:deviceId", (req, res) => {
 router.get("/history/:deviceId", async (req, res) => {
   const { deviceId } = req.params;
   const limit = parseInt(req.query.limit, 10) || 50;
-  
+
   try {
-    const db = await getDbManager();
-    
+    const db = getDbManager(req);
+
     if (db) {
       // Get from database
       const rows = await db.getHistory(deviceId, limit);
@@ -88,22 +79,24 @@ router.get("/history/:deviceId", async (req, res) => {
     } else {
       // Get from in-memory dataStore
       const data = dataStore.getDeviceData(deviceId);
-      
+
       if (!data || data.length === 0) {
-        return res.status(404).json({ error: "No history found for this device" });
+        return res
+          .status(404)
+          .json({ error: "No history found for this device" });
       }
-      
+
       // Return the most recent entries up to the limit
       const history = data
-        .slice(-limit)  // Get last N entries
-        .reverse()      // Most recent first
-        .map(entry => ({
+        .slice(-limit) // Get last N entries
+        .reverse() // Most recent first
+        .map((entry) => ({
           device_id: deviceId,
           timestamp: new Date(entry.timestamp).toISOString(),
           data: entry.data,
-          created_at: new Date(entry.timestamp).toISOString()
+          created_at: new Date(entry.timestamp).toISOString(),
         }));
-      
+
       res.json(history);
     }
   } catch (err) {
