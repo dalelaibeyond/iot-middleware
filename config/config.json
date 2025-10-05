@@ -1,63 +1,64 @@
 {
-    "mqtt": {
-        "topics": ["sensors/#", "devices/#"],
-        "options": {
-            "qos": 1,
-            "reconnectPeriod": 5000,
-            "keepalive": 60
-        },
-        "patterns": {
-            "sensors": "sensors/+/+",
-            "devices": "devices/+/+"
-        }
+  "mqtt": {
+    "topics": ["V5008Upload/#", "V6800Upload/#", "G6000Upload/#"],
+    "options": {
+      "qos": 1,
+      "reconnectPeriod": 5000,
+      "keepalive": 60
     },
-    "cache": {
-        "enabled": true,
-        "maxSize": 10000,
-        "ttl": 3600000
-    },
-    "server": {
-        "rateLimit": {
-            "windowMs": 900000,
-            "maxRequests": 100
-        },
-        "compression": {
-            "level": 6,
-            "threshold": "1kb"
-        }
-    },
-    "writeBuffer": {
-        "maxSize": 1000,
-        "flushInterval": 5000,
-        "maxRetries": 3
-    },
-    "callbacks": {
-        "enabled": false,
-        "retryLimit": 3,
-        "retryDelay": 1000
-    },
-    "logger": {
-        "level": "info",
-        "file": {
-            "dir": "logs",
-            "filename": "app.log"
-        },
-        "format": "[{timestamp}] {level} {message}"
-    },
-    "messageRelay": {
-        "enabled": true,
-        "topicPrefix": "new",
-        "patterns": {
-            "sensors": "sensors/${prefix}/${gatewayId}/${type}",
-            "devices": "devices/${prefix}/${gatewayId}/${type}"
-        }
-    },
-    "database": {
-        "enabled": true,
-        "connectionPool": {
-            "waitForConnections": true,
-            "connectionLimit": 10,
-            "queueLimit": 0
-        }
+    "patterns": {
+      "V5008Upload": "V5008Upload/+",
+      "V6800Upload": "V6800Upload/+",
+      "G6000Upload": "G6000Upload/+"
     }
+  },
+  "cache": {
+    "enabled": true,
+    "maxSize": 10000,
+    "ttl": 3600000
+  },
+  "server": {
+    "rateLimit": {
+      "windowMs": 900000,
+      "maxRequests": 100
+    },
+    "compression": {
+      "level": 6,
+      "threshold": "1kb"
+    }
+  },
+  "writeBuffer": {
+    "maxSize": 1000,
+    "flushInterval": 5000,
+    "maxRetries": 3
+  },
+  "callbacks": {
+    "enabled": false,
+    "retryLimit": 3,
+    "retryDelay": 1000
+  },
+  "logger": {
+    "level": "info",
+    "file": {
+      "dir": "logs",
+      "filename": "app.log"
+    },
+    "format": "[{timestamp}] {level} {message}"
+  },
+  "messageRelay": {
+    "enabled": true,
+    "patterns": {
+      "V5008Upload": "dig/sensors/${gatewayId}",
+      "V6800Upload": "dig/sensors/${gatewayId}",
+      "G6000Upload": "dig/sensors/${gatewayId}"
+    }
+  },
+  "database": {
+    "enabled": true,
+    "connectionPool": {
+      "waitForConnections": true,
+      "connectionLimit": 10,
+      "queueLimit": 0
+    }
+  }
 }

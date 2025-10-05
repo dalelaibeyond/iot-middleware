@@ -184,8 +184,8 @@ class Application extends BaseComponent {
       ]);
 
       // Skip relayed messages to prevent processing loops
-      const relayPrefix = this.config.messageRelay?.topicPrefix || "new";
-      if (topic.includes(`/${relayPrefix}/`)) {
+      // Skip messages from dig/sensors/ topics as these are relayed messages for upper applications
+      if (topic.startsWith("dig/sensors/")) {
         this.logger.debug(`Skipping relayed message on topic: ${topic}`);
         return;
       }

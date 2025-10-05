@@ -50,7 +50,7 @@ class TopicManager extends BaseComponent {
     return {
       category: parts[0],
       gatewayId: parts[1],
-      type: parts[2],
+      type: parts[2] || null,
       remaining: parts.slice(3).join("/"),
     };
   }
@@ -69,8 +69,9 @@ class TopicManager extends BaseComponent {
     return (
       components.category &&
       components.gatewayId &&
-      components.type &&
-      ["sensors", "devices"].includes(components.category)
+      ["V5008Upload", "V6800Upload", "G6000Upload"].includes(
+        components.category
+      )
     );
   }
 

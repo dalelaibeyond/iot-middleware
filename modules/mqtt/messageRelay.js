@@ -42,34 +42,40 @@ class MessageRelay extends BaseComponent {
 
   setupRelayFromConfig() {
     const relayConfig = this.config.messageRelay;
-    const prefix = relayConfig.topicPrefix || "new";
 
     // Create relay rules for each pattern
-    Object.entries(relayConfig.patterns).forEach(([category, pattern]) => {
-      // Source pattern matches original topics like "sensors/gateway123/temperature"
-      const sourcePattern = `^${category}/([^/]+)/([^/]+)$`;
+    Object.entries(relayConfig.patterns).forEach(
+      ([category, targetPattern]) => {
+        // Source pattern matches original topics like "V5008Upload/gateway123/temperature"
+        const sourcePattern = `^${category}/([^/]+)/(.*)$`;
 
-      this.addRelayRule({
-        sourcePattern: sourcePattern,
-        category: category,
-        prefix: prefix,
-        transform: (message) => {
-          // Build the new topic from the original topic
-          if (message.meta && message.meta.rawTopic) {
-            const parts = message.meta.rawTopic.split("/");
-            if (parts.length >= 3) {
-              const newTopic = `${parts[0]}/${prefix}/${parts[1]}/${parts[2]}`;
-              return { topic: newTopic, payload: message };
+        this.addRelayRule({
+          sourcePattern: sourcePattern,
+          category: category,
+          targetPattern: targetPattern,
+          transform: (message) => {
+            // Extract gateway ID from the original topic
+            if (message.meta && message.meta.rawTopic) {
+              const parts = message.meta.rawTopic.split("/");
+              if (parts.length >= 2) {
+                const gatewayId = parts[1];
+                // Replace ${gatewayId} placeholder with actual gateway ID
+                const newTopic = targetPattern.replace(
+                  "${gatewayId}",
+                  gatewayId
+                );
+                return { topic: newTopic, payload: message };
+              }
             }
-          }
-          return { topic: null, payload: message };
-        },
-      });
+            return { topic: null, payload: message };
+          },
+        });
 
-      this.logger.debug(
-        `Added relay rule for category: ${category} with prefix: ${prefix}`
-      );
-    });
+        this.logger.debug(
+          `Added relay rule for category: ${category} with target pattern: ${targetPattern}`
+        );
+      }
+    );
   }
 
   addRelayRule(rule) {
@@ -154,7 +160,7 @@ class MessageRelay extends BaseComponent {
       id,
       sourcePattern: rule.sourcePattern,
       category: rule.category,
-      prefix: rule.prefix,
+      targetPattern: rule.targetPattern,
       hasTransform: !!rule.transform,
     }));
   }
