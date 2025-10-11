@@ -64,7 +64,22 @@ class MessageRelay extends BaseComponent {
                   "${gatewayId}",
                   gatewayId
                 );
-                return { topic: newTopic, payload: message };
+                // Create a clean normalized payload with only the necessary fields
+                const normalizedPayload = {
+                  deviceId: message.deviceId,
+                  deviceType: message.deviceType,
+                  sensorId: message.sensorId,
+                  sensorType: message.sensorType,
+                  ts: message.ts,
+                  payload: message.payload,
+                  meta: message.meta,
+                };
+
+                console.log(
+                  `[MESSAGE RELAY] Creating normalized payload for ${newTopic}:`,
+                  normalizedPayload
+                );
+                return { topic: newTopic, payload: normalizedPayload };
               }
             }
             return { topic: null, payload: message };
@@ -138,6 +153,10 @@ class MessageRelay extends BaseComponent {
       });
 
       this.relayCount++;
+      console.log(
+        `[MESSAGE RELAY] Relaying message from ${sourceTopic} to ${transformed.topic}:`,
+        transformed.payload
+      );
       this.logger.debug(
         `Relayed message from ${sourceTopic} to ${transformed.topic}`
       );

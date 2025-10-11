@@ -159,18 +159,23 @@ class MQTTClient extends BaseComponent {
     }
 
     return new Promise((resolve, reject) => {
-      this.client.publish(
-        topic,
-        typeof message === "string" ? message : JSON.stringify(message),
-        { qos: 1, ...options },
-        (err) => {
-          if (err) {
-            reject(err);
-          } else {
-            resolve();
-          }
+      let payload;
+      if (typeof message === "string") {
+        payload = message;
+      } else if (Buffer.isBuffer(message)) {
+        payload = message;
+      } else {
+        // For objects, ensure proper JSON formatting
+        payload = JSON.stringify(message, null, 0);
+      }
+
+      this.client.publish(topic, payload, { qos: 1, ...options }, (err) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve();
         }
-      );
+      });
     });
   }
 

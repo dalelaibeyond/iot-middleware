@@ -11,7 +11,7 @@ const WebSocketServer = require("./api/WebSocketServer");
 const CallbackManager = require("./api/CallbackManager");
 const dataStore = require("./storage/dataStore");
 const eventBus = require("./core/eventBus");
-const normalizeTemperature = require("./normalizers/temperatureNormalizer");
+const { normalize } = require("./normalizers");
 
 class Application extends BaseComponent {
   constructor(options = {}) {
@@ -109,19 +109,31 @@ class Application extends BaseComponent {
         // Special handling for message processor middleware
         if (component.name === "messageProcessor") {
           instance.use(async (message, context, next) => {
-            this.logger.debug("Applying temperature normalizer", {
-              deviceId: message.devId || message.deviceId,
+            // Extract device info from topic for logging (works for all device types)
+            const topicParts = context.topic.split("/");
+            const deviceType = topicParts[0].slice(0, 5);
+            const gatewayId = topicParts[1] || "unknown";
+
+            this.logger.debug("Applying message normalizer", {
+              deviceType: deviceType,
+              gatewayId: gatewayId,
             });
-            const normalized = normalizeTemperature(
-              message,
-              context.topic,
-              context
-            );
-            Object.assign(message, normalized); // Merge normalized into message
-            this.logger.debug("Message normalized", {
-              deviceId: message.deviceId,
-              sensorType: message.sensorType,
-            });
+
+            const normalized = normalize(context.topic, message, context);
+
+            if (normalized) {
+              Object.assign(message, normalized); // Merge normalized into message
+              this.logger.debug("Message normalized", {
+                deviceId: message.deviceId,
+                deviceType: message.deviceType,
+                sensorType: message.sensorType,
+                sensorId: message.sensorId,
+              });
+            } else {
+              this.logger.warn(
+                "Message normalization failed, using original message"
+              );
+            }
             await next();
           });
         }
@@ -133,6 +145,10 @@ class Application extends BaseComponent {
             await instance.subscribe(topic, this.handleMessage.bind(this));
             this.logger.info(`Subscribed to MQTT topic: ${topic}`);
           }
+
+          // Also subscribe to dig/# topics to handle relayed messages for external consumers
+          await instance.subscribe("dig/#", this.handleDigMessage.bind(this));
+          this.logger.info(`Subscribed to MQTT topic: dig/#`);
         }
       } catch (error) {
         this.logger.error(`Failed to initialize ${component.name}:`, error);
@@ -196,11 +212,26 @@ class Application extends BaseComponent {
         return;
       }
 
-      // Parse message
-      const payload = JSON.parse(message.toString());
-      this.logger.debug(`Parsed payload`, {
-        deviceId: payload.devId || payload.deviceId,
-      });
+      // Extract device info from topic for logging
+      const topicParts = topic.split("/");
+      const deviceType = topicParts[0].slice(0, 5);
+      const gatewayId = topicParts[1] || "unknown";
+
+      // Parse message based on device type
+      let payload;
+      if (deviceType === "V6800") {
+        // V6800 sends JSON format
+        payload = JSON.parse(message.toString());
+        this.logger.debug(`Parsed JSON payload for V6800`, {
+          deviceId: payload.devId || payload.deviceId || gatewayId,
+        });
+      } else {
+        // V5008 and G6000 send byte code format - keep as Buffer for the parser to handle
+        payload = message;
+        this.logger.debug(`Received byte code payload for ${deviceType}`, {
+          gatewayId: gatewayId,
+        });
+      }
 
       // Extract topic components
       const topicComponents = topicManager.parseTopicComponents(topic);
@@ -210,6 +241,41 @@ class Application extends BaseComponent {
       this.logger.debug(`Message processed successfully for topic: ${topic}`);
     } catch (error) {
       this.logger.error(`Error handling message on topic ${topic}:`, error);
+    }
+  }
+
+  async handleDigMessage(topic, message) {
+    try {
+      this.logger.debug(`Received dig message on topic: ${topic}`);
+
+      // Parse the JSON string back to an object
+      let parsedMessage;
+      try {
+        const messageStr = message.toString();
+        // Check if it's already a JSON string
+        if (messageStr.startsWith("{")) {
+          parsedMessage = JSON.parse(messageStr);
+          console.log(
+            `[DIG MESSAGE] Received normalized JSON data:`,
+            parsedMessage
+          );
+        } else {
+          // Handle case where message might be a buffer or other format
+          console.log(`[DIG MESSAGE] Received non-JSON message:`, messageStr);
+        }
+      } catch (error) {
+        this.logger.error(
+          `Failed to parse JSON message on topic ${topic}:`,
+          error
+        );
+        console.log(`[DIG MESSAGE] Raw message:`, message.toString());
+        return;
+      }
+
+      // Don't process relayed messages through the normal pipeline to avoid loops
+      // This is just for external consumers who subscribe to dig/#
+    } catch (error) {
+      this.logger.error(`Error handling dig message on topic ${topic}:`, error);
     }
   }
 
