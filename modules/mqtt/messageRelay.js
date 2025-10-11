@@ -10,24 +10,12 @@ class MessageRelay extends BaseComponent {
 
   async initialize() {
     try {
-      if (!this.config.messageRelay || !this.config.messageRelay.enabled) {
-        this.logger.info("Message relay is disabled");
-        return;
-      }
-
+      // Message relay is enabled by default, will be updated in setupRelayFromConfig
       // Subscribe to processed messages
       eventBus.on("message.processed", this.handleMessage.bind(this));
 
-      // Load relay rules from config
-      if (this.config.relay && this.config.relay.rules) {
-        this.config.relay.rules.forEach((rule) => {
-          this.addRelayRule(rule);
-        });
-      } else if (
-        this.config.messageRelay &&
-        this.config.messageRelay.patterns
-      ) {
-        // Auto-generate rules from messageRelay config
+      // Auto-generate rules from messageRelay config
+      if (this.options.patterns) {
         this.setupRelayFromConfig();
       }
 
@@ -41,7 +29,7 @@ class MessageRelay extends BaseComponent {
   }
 
   setupRelayFromConfig() {
-    const relayConfig = this.config.messageRelay;
+    const relayConfig = this.options;
 
     // Create relay rules for each pattern
     Object.entries(relayConfig.patterns).forEach(
@@ -75,10 +63,6 @@ class MessageRelay extends BaseComponent {
                   meta: message.meta,
                 };
 
-                console.log(
-                  `[MESSAGE RELAY] Creating normalized payload for ${newTopic}:`,
-                  normalizedPayload
-                );
                 return { topic: newTopic, payload: normalizedPayload };
               }
             }
@@ -153,10 +137,6 @@ class MessageRelay extends BaseComponent {
       });
 
       this.relayCount++;
-      console.log(
-        `[MESSAGE RELAY] Relaying message from ${sourceTopic} to ${transformed.topic}:`,
-        transformed.payload
-      );
       this.logger.debug(
         `Relayed message from ${sourceTopic} to ${transformed.topic}`
       );

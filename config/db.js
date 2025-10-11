@@ -1,17 +1,20 @@
 const mysql = require("mysql2/promise");
 const logger = require("../utils/logger");
-const config = require("./config.json");
-require("dotenv").config();
+const ModularConfigManager = require("./ModularConfigManager");
+require("dotenv").config");
+
+const configManager = new ModularConfigManager();
+const config = configManager.getConfig();
 
 let pool = null;
 
-if (config.database.enabled) {
+if (configManager.isModuleEnabled("storage") && configManager.isComponentEnabled("storage", "database")) {
   pool = mysql.createPool({
     host: process.env.DB_HOST || "localhost",
     user: process.env.DB_USER || "root",
     password: process.env.DB_PASS || "",
     database: process.env.DB_NAME || "iot_middleware",
-    ...config.database.connectionPool
+    ...configManager.getComponentConfig("storage", "database").connectionPool
   });
 
   // Test the connection
@@ -34,5 +37,5 @@ if (config.database.enabled) {
 
 module.exports = {
   pool,
-  isEnabled: config.database.enabled
+  isEnabled: configManager.isModuleEnabled("storage") && configManager.isComponentEnabled("storage", "database")
 };

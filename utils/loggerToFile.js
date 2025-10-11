@@ -2,7 +2,9 @@
 const fs = require("fs");
 const path = require("path");
 
-const config = require('../config/config.json');
+const ModularConfigManager = require('../config/ModularConfigManager');
+const configManager = new ModularConfigManager();
+const config = configManager.getConfig();
 
 const logDir = path.join(__dirname, "..", config.logger.file.dir);
 if (!fs.existsSync(logDir)) {

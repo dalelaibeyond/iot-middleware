@@ -1,421 +1,505 @@
-# IoT Middleware v3
+# IoT Middleware v3 - Modular Architecture
+
+A highly modular IoT middleware platform for processing, normalizing, and distributing sensor data from various IoT devices.
 
 ## Overview
-Advanced high-performance IoT middleware designed for processing thousands of concurrent sensor messages while providing a robust bridge between MQTT-enabled devices and applications.
 
-### High-Performance Architecture
-- **Parallel Processing**
-  - Worker Pool for concurrent message processing
-  - Auto-scaling based on system load
-  - Worker health monitoring and recovery
-  - Efficient thread utilization
+IoT Middleware v3 provides a flexible, configuration-driven architecture for handling IoT sensor data. It supports multiple device types (V5008, V6800, G6000) through pluggable normalizers and provides various output options including database storage, REST APIs, WebSockets, and message relaying.
 
-- **Resilience Patterns**
-  - Circuit breaker for error prevention
-  - Rate limiting for traffic control
-  - Memory-aware operations
-  - Graceful degradation under high load
+## Architecture
 
-- **Optimized Data Handling**
-  - Smart batch processing with memory management
-  - Write buffer optimization
-  - Efficient message queuing
-  - Performance monitoring and metrics
+The middleware is organized into four module groups:
 
-### Core Features
-- **Event-Driven Framework**
-  - Central event bus for decoupled communication
-  - Pluggable module system for extensibility
-  - Middleware-based message processing pipeline
-  - Dynamic plugin loading system
+### Group 1: Core (Required)
+- **MQTT Client**: Receives raw sensor messages from MQTT brokers
+- **Normalizer**: Central message normalizer with device-specific parsers
+- **Data Store**: In-memory storage for normalized messages
 
-- **Real-time Data Processing**
-  - MQTT message normalization with configurable schemas
-  - Multi-topic MQTT subscription support
-  - WebSocket broadcasting for real-time updates
-  - HTTP callback notifications with retry mechanism
-  - In-memory latest data store
+### Group 2: Storage (Optional)
+- **Database**: MySQL database for persistent storage
+- **Cache**: In-memory caching for frequently accessed data
+- **Write Buffer**: Buffered writing to database for performance
 
-### MQTT Topic Format
-The middleware expects MQTT messages to follow this topic hierarchy:
-```
-<category>/<gatewayId>/<type>
-```
+### Group 3: API (Optional)
+- **REST API**: RESTful API for HTTP access to sensor data
+- **WebSocket**: Real-time API for live sensor data updates
+- **Webhook**: Webhook API for push notifications
 
-Valid topic examples:
-- `sensors/gateway123/temperature` - For temperature sensor data
-- `sensors/gateway123/humidity` - For humidity sensor data
-- `devices/gateway456/status` - For device status updates
-- `devices/gateway456/control` - For device control messages
+### Group 4: Relay (Optional)
+- **Message Relay**: Relays normalized messages to MQTT brokers
 
-Where:
-- `<category>` is either "sensors" or "devices"
-- `<gatewayId>` is your gateway's unique identifier
-- `<type>` is the sensor type or message type
+## Features
 
-### Message Relay Feature
-The middleware can automatically republish normalized messages to new topics for easier integration with other systems.
+- **Modular Architecture**: Enable/disable features through configuration
+- **Device Support**: Built-in support for V5008, V6800, and G6000 devices
+- **Multiple Outputs**: Database storage, REST API, WebSocket, and message relay
+- **Fault Tolerance**: Continues operating even if optional services are unavailable
+- **Environment Variables**: Full support for environment variable configuration
+- **Plugin System**: Easy to extend with new device types and components
 
-#### Relay Topic Format
-When enabled, normalized messages are republished with the following topic structure:
-```
-<category>/<prefix>/<gatewayId>/<type>
-```
+## Quick Start
 
-Example:
-- Original topic: `sensors/gateway123/temperature`
-- Relay topic: `sensors/new/gateway123/temperature`
+### Prerequisites
 
-#### Configuration
-Enable and configure message relay in `config.json`:
-```json
-{
-    "messageRelay": {
-        "enabled": true,
-        "topicPrefix": "new",
-        "patterns": {
-            "sensors": "sensors/${prefix}/${gatewayId}/${type}",
-            "devices": "devices/${prefix}/${gatewayId}/${type}"
-        }
-    }
-}
-```
+- Node.js 14 or higher
+- MySQL (optional, for database storage)
+- MQTT Broker (optional, for receiving messages)
 
-- **Efficient Data Storage**
-  - Write buffer with batch processing
-  - MySQL historical data storage
-  - Efficient query support with indexing
+### Installation
 
-- **Rich Integration Interfaces**
-  - RESTful API endpoints
-  - WebSocket real-time feed
-  - HTTP callback system
-  - Interactive documentation
-
-- **Production-Ready Features**
-  - Rate limiting
-  - Data compression
-  - Error handling & recovery
-  - Health monitoring
-  - System metrics
-
-## Setup
-
-### 1. Install Dependencies
 ```bash
+# Clone the repository
+git clone <repository-url>
+cd iot-middleware-v3
+
+# Install dependencies
 npm install
+
+# Copy environment template
+cp .env.example .env
+
+# Edit configuration
+nano config/modular-config.json
 ```
 
-### 2. Configuration
+### Configuration
 
-The middleware uses a two-tier configuration system:
-1. Environment-specific variables in `.env`
-2. System-wide settings in `config/config.json`
+The middleware uses `config/modular-config.json` for configuration. Environment variables can be used with `${VAR_NAME:default}` syntax.
 
-#### 2.1 Environment Variables (`.env`)
-Create a `.env` file with:
-```properties
-# Server Configuration
-PORT=3000
-NODE_ENV=development
-DEBUG=true
+Key environment variables:
+- `PORT`: Server port (default: 3000)
+- `MQTT_URL`: MQTT broker URL (default: mqtt://localhost:1883)
+- `DB_HOST`: Database host (default: localhost)
+- `DB_USER`: Database user (default: root)
+- `DB_PASS`: Database password (default: empty)
+- `DB_NAME`: Database name (default: iot_middleware)
+- `LOG_LEVEL`: Logging level (default: info)
 
-# MQTT Connection
-MQTT_URL=mqtt://localhost:1883
+### Running the Application
 
-# Database Configuration
-DB_HOST=localhost
-DB_USER=root
-DB_PASS=yourpassword
-DB_NAME=iot_middleware
-```
-
-#### 2.2 System Configuration (`config/config.json`)
-Create or modify `config/config.json` to control system behavior:
-
-```json
-{
-    "mqtt": {
-        "topics": [
-            "sensors/#",
-            "devices/#"
-        ],
-        "options": {
-            "qos": 1,
-            "reconnectPeriod": 5000,
-            "keepalive": 60
-        }
-    },
-    "server": {
-        "rateLimit": {
-            "windowMs": 900000,
-            "maxRequests": 100
-        },
-        "compression": {
-            "level": 6,
-            "threshold": "1kb"
-        }
-    },
-    "writeBuffer": {
-        "maxSize": 1000,
-        "flushInterval": 5000,
-        "maxRetries": 3
-    },
-    "callbacks": {
-        "retryLimit": 3,
-        "retryDelay": 1000
-    },
-    "logger": {
-        "level": "info",
-        "file": {
-            "dir": "logs",
-            "filename": "app.log"
-        },
-        "format": "[{timestamp}] {level} {message}"
-    }
-}
-```
-
-##### Configuration Sections:
-
-- **mqtt**: MQTT subscription settings
-  - `topics`: Array of topics to subscribe to
-  - `options`: MQTT client options (QoS, reconnection, etc.)
-
-- **server**: HTTP server settings
-  - `rateLimit`: API rate limiting configuration
-  - `compression`: Response compression settings
-
-- **writeBuffer**: Database write optimization
-  - `maxSize`: Maximum records before forced flush
-  - `flushInterval`: Milliseconds between auto-flushes
-  - `maxRetries`: Retry attempts for failed writes
-
-- **callbacks**: HTTP callback settings
-  - `retryLimit`: Maximum retry attempts
-  - `retryDelay`: Milliseconds between retries
-
-- **logger**: Logging configuration
-  - `level`: Log level (error, warn, info, debug)
-  - `file`: Log file settings
-  - `format`: Log message format template
-
-### 3. Database Setup
-Create MySQL database and tables:
-
-```sql
-CREATE DATABASE iot_middleware;
-USE iot_middleware;
-
-CREATE TABLE sensor_data (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    device_id VARCHAR(64) NOT NULL,
-    sensor_type VARCHAR(32) NOT NULL,
-    timestamp DATETIME NOT NULL,
-    payload JSON NOT NULL,
-    meta JSON,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_device_ts (device_id, timestamp)
-);
-```
-
-### 4. Run Server
-Development mode with auto-reload:
 ```bash
+# Development mode
 npm run dev
-```
 
-Production mode:
-```bash
+# Production mode
 npm start
 ```
 
-## Features & Endpoints
+## Configuration Guide
 
-### REST API
+### Module Configuration
 
-1. Latest Data
-```http
-GET /api/latest                 # Get all latest sensor data
-GET /api/latest/:deviceId       # Get latest data for specific device
-```
+Each module group can be enabled or disabled independently:
 
-2. Historical Data
-```http
-GET /api/history/:deviceId      # Get device history
-Query Parameters:
-  - limit: Number of records (default: 50)
-```
-
-3. System & Monitoring
-```http
-GET /system/health              # Health check endpoint
-GET /system/metrics             # System metrics
-```
-
-### WebSocket Interface
-
-Connect to `ws://localhost:3000` to receive real-time updates.
-Data format matches the REST API response format.
-
-### HTTP Callbacks
-
-Register callback URLs to receive real-time notifications:
-```http
-POST /api/callbacks
-Content-Type: application/json
-
-{
-    "url": "http://your-server/callback",
-    "retryLimit": 3,            # Optional
-    "retryDelay": 1000         # Optional, in milliseconds
-}
-```
-
-## Message Format
-
-### Input (Example Temperature Sensor)
 ```json
 {
-  "devId": "A-Temp-001",
-  "rackNo": "42",
-  "posU": "18",
-  "tmp": 27.3,
-  "unit": "C",
-  "time": 1695653130000
-}
-```
-
-### Normalized Output
-```json
-{
-  "deviceId": "A-Temp-001",
-  "sensorType": "temperature",
-  "ts": "2025-09-25T08:05:30.000Z",
-  "payload": {
-    "temp": 27.3,
-    "unit": "C",
-    "rackNo": "42",
-    "posU": "18"
-  },
-  "meta": {
-    "rawTopic": "sensors/temperature/aa",
-    "gatewayId": "temperature"
+  "modules": {
+    "core": {
+      "enabled": true,
+      "components": {
+        "mqtt": { "enabled": true },
+        "normalizer": { "enabled": true },
+        "dataStore": { "enabled": true }
+      }
+    },
+    "storage": {
+      "enabled": true,
+      "components": {
+        "database": { "enabled": true },
+        "cache": { "enabled": true }
+      }
+    },
+    "api": {
+      "enabled": true,
+      "components": {
+        "rest": { "enabled": true },
+        "websocket": { "enabled": true },
+        "webhook": { "enabled": false }
+      }
+    },
+    "relay": {
+      "enabled": true,
+      "components": {
+        "messageRelay": { "enabled": true }
+      }
+    }
   }
 }
 ```
 
-## Project Structure
-```
-iot-middleware-v3/
-├── config/
-│   ├── config.json        # System configuration
-│   ├── db.js             # Database configuration
-│   └── schema.sql        # Database schema
-├── modules/
-│   ├── core/             # Core framework components
-│   │   ├── eventBus.js   # Central event system
-│   │   ├── messageProcessor.js # Message pipeline
-│   │   └── pluginManager.js # Plugin system
-│   ├── plugins/          # Extensible plugins
-│   │   └── messageEnrichment.js # Message enhancement
-│   ├── mqttClient.js     # MQTT subscriber
-│   ├── mqttHandler.js    # MQTT message handler
-│   ├── wsServer.js       # WebSocket server
-│   ├── writeBuffer.js    # Database write buffer
-│   ├── callbackManager.js # HTTP callbacks
-│   ├── dataStore.js      # In-memory store
-│   ├── dbStore.js        # MySQL operations
-│   └── normalizers/      # Message normalizers
-├── routes/
-│   ├── api.js            # API routes
-│   ├── index.js          # Main routes
-│   └── system.js         # System endpoints
-├── utils/
-│   └── logger.js         # Logging utility
-├── public/
-│   └── about.html        # Documentation page
-└── server.js             # Main application
+### MQTT Configuration
+
+```json
+{
+  "modules": {
+    "core": {
+      "components": {
+        "mqtt": {
+          "enabled": true,
+          "config": {
+            "url": "${MQTT_URL:mqtt://localhost:1883}",
+            "topics": ["V5008Upload/#", "V6800Upload/#", "G6000Upload/#"],
+            "options": {
+              "qos": 1,
+              "reconnectPeriod": 5000,
+              "keepalive": 60
+            }
+          }
+        }
+      }
+    }
+  }
+}
 ```
 
-## Testing
+### Database Configuration
 
-### 1. MQTT Messages
-```bash
-# Temperature sensor data
-mosquitto_pub -t "sensors/temperature/aa" -m '{
-  "devId": "A-Temp-001",
-  "rackNo": "42",
-  "posU": "18",
-  "tmp": 27.3,
-  "unit": "C",
-  "time": 1695653130000
-}'
+```json
+{
+  "modules": {
+    "storage": {
+      "components": {
+        "database": {
+          "enabled": true,
+          "config": {
+            "connectionPool": {
+              "waitForConnections": true,
+              "connectionLimit": 10,
+              "queueLimit": 0
+            }
+          }
+        }
+      }
+    }
+  }
+}
 ```
 
-### 2. WebSocket Client
+## API Reference
+
+### REST API Endpoints
+
+#### Health Check
+```
+GET /api/health
+```
+Returns the health status of the application.
+
+#### Application Statistics
+```
+GET /api/stats
+```
+Returns statistics about enabled modules and components.
+
+#### Device List
+```
+GET /api/devices
+```
+Returns a list of all devices that have sent data.
+
+#### Device Data
+```
+GET /api/devices/:deviceId/data?limit=50&startTime=2023-01-01&endTime=2023-01-02
+```
+Returns data for a specific device with optional filtering.
+
+#### Device History
+```
+GET /api/devices/:deviceId/history?limit=50
+```
+Returns historical data for a device from the database.
+
+#### Configuration
+```
+GET /api/config
+```
+Returns the current configuration (without sensitive data).
+
+#### Normalizer Information
+```
+GET /api/normalizers
+```
+Returns information about registered device parsers.
+
+### WebSocket API
+
+Connect to `ws://localhost:3000` to receive real-time sensor data updates.
+
+## Device Integration
+
+### Supported Device Types
+
+#### V5008 Devices
+- Sends binary/hex encoded messages
+- Topics: `V5008Upload/<gatewayId>/<sensorType>`
+- Parser extracts sensor data from hex payload
+
+#### V6800 Devices
+- Sends JSON format messages
+- Topics: `V6800Upload/<gatewayId>/<sensorType>`
+- Parser extracts data from JSON payload
+
+#### G6000 Devices
+- Sends binary/hex encoded messages
+- Topics: `G6000Upload/<gatewayId>/<sensorType>`
+- Parser extracts sensor data from hex payload
+
+### Message Format
+
+All normalized messages follow this structure:
+
+```json
+{
+  "deviceId": "gateway001",
+  "deviceType": "V6800",
+  "sensorId": "gateway001-temperature",
+  "sensorType": "temperature",
+  "ts": "2023-01-01T12:00:00.000Z",
+  "payload": {
+    // Device-specific sensor data
+  },
+  "meta": {
+    "rawTopic": "V6800Upload/gateway001/temperature",
+    "deviceType": "V6800",
+    "normalizedBy": "V6800",
+    "normalizedAt": "2023-01-01T12:00:00.000Z",
+    "parserVersion": "1.0.0"
+  }
+}
+```
+
+## Adding New Device Types
+
+### 1. Create a Parser
+
 ```javascript
-const ws = new WebSocket('ws://localhost:3000');
-ws.onmessage = (event) => {
-    console.log('Received:', JSON.parse(event.data));
-};
+// modules/normalizers/myDeviceParser.js
+const logger = require("../../utils/logger");
+
+function parse(topic, message, meta = {}) {
+  try {
+    // Extract device info from topic
+    const topicParts = topic.split("/");
+    const deviceType = topicParts[0].slice(0, 5);
+    const gatewayId = topicParts[1] || "unknown";
+    const sensorType = topicParts[2] || "unknown";
+
+    // Parse message
+    const payload = typeof message === "string" ? JSON.parse(message) : message;
+
+    // Create normalized message
+    return {
+      deviceId: gatewayId,
+      deviceType: deviceType,
+      sensorId: `${gatewayId}-${sensorType}`,
+      sensorType: sensorType,
+      ts: new Date().toISOString(),
+      payload: payload,
+      meta: {
+        rawTopic: topic,
+        deviceType: deviceType,
+        ...meta
+      }
+    };
+  } catch (error) {
+    logger.error(`MyDevice parsing failed: ${error.message}`);
+    return null;
+  }
+}
+
+module.exports = { parse };
 ```
 
-## Performance Features
+### 2. Register the Parser
 
-- **Write Buffering**: Efficient batch database writes
-- **Rate Limiting**: Prevent API abuse
-- **Compression**: Reduced bandwidth usage
-- **Connection Pooling**: Efficient database connections
-- **Automatic Retries**: For HTTP callbacks
+```javascript
+// In modules/normalizers/NormalizerRegistry.js
+const myDeviceParser = require("./myDeviceParser");
 
-## Monitoring & Maintenance
-
-### Health Check
-```http
-GET /system/health
+// In registerDefaultParsers()
+this.registerParser("MYDEV", myDeviceParser, {
+  version: "1.0.0",
+  description: "Parser for MyDevice sensors"
+});
 ```
 
-### System Metrics
-```http
-GET /system/metrics
+### 3. Update Configuration
+
+```json
+{
+  "modules": {
+    "core": {
+      "components": {
+        "mqtt": {
+          "config": {
+            "topics": ["MYDEVUpload/#"]
+          }
+        }
+      }
+    }
+  }
+}
 ```
-Returns:
-- CPU & Memory usage
-- Connected WebSocket clients
-- Write buffer status
-- Database connection pool status
 
-## Production Considerations
+## Adding New Components
 
-1. **Security**
-   - Use TLS for MQTT (mqtts://)
-   - Enable authentication
-   - Set up proper firewall rules
-   - Configure appropriate rate limits
+### 1. Create Component Class
 
-2. **Configuration**
-   - Adjust buffer sizes based on load
-   - Set appropriate retry limits
-   - Configure logging levels
-   - Tune compression settings
+```javascript
+// modules/myComponent/MyComponent.js
+const BaseComponent = require("../core/BaseComponent");
 
-3. **Scaling**
-   - Implement Redis for shared state
-   - Use database replication
-   - Consider message queue for high load
-   - Configure multiple MQTT topics
+class MyComponent extends BaseComponent {
+  async initialize() {
+    // Initialization logic
+    this.logger.info("MyComponent initialized");
+  }
+  
+  async shutdown() {
+    // Cleanup logic
+    super.shutdown();
+  }
+  
+  // Component methods
+  processMessage(message) {
+    // Process message
+  }
+}
 
-4. **Monitoring**
-   - Set up proper logging levels
-   - Monitor system metrics
-   - Configure alerts
-   - Watch write buffer metrics
+module.exports = MyComponent;
+```
+
+### 2. Register Component Factory
+
+```javascript
+// In modules/core/ComponentRegistry.js
+registerDefaultFactories() {
+  // ... existing factories
+  this.registerFactory("myComponent", () => require("../myComponent/MyComponent"));
+}
+```
+
+### 3. Add to Configuration
+
+```json
+{
+  "modules": {
+    "custom": {
+      "enabled": true,
+      "components": {
+        "myComponent": {
+          "enabled": true,
+          "config": {
+            "option1": "value1"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## Monitoring and Debugging
+
+### Logging
+
+The middleware uses structured logging with configurable levels:
+- `error`: Error messages
+- `warn`: Warning messages
+- `info`: Informational messages
+- `debug`: Debug messages
+
+Set the `LOG_LEVEL` environment variable to control verbosity.
+
+### Health Checks
+
+Use the `/api/health` endpoint to monitor application health.
+
+### Statistics
+
+The `/api/stats` endpoint provides detailed statistics about:
+- Enabled modules and components
+- Normalizer registry statistics
+- Component status
+
+## Database Schema
+
+The middleware uses a `sensor_data` table with the following structure:
+
+```sql
+CREATE TABLE sensor_data (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  device_id VARCHAR(255) NOT NULL,
+  device_type VARCHAR(50) NOT NULL,
+  sensor_add VARCHAR(50),
+  sensor_port VARCHAR(50),
+  sensor_id VARCHAR(255) NOT NULL,
+  sensor_type VARCHAR(100) NOT NULL,
+  timestamp DATETIME NOT NULL,
+  payload JSON,
+  meta JSON,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_device_id (device_id),
+  INDEX idx_timestamp (timestamp),
+  INDEX idx_device_type (device_type)
+);
+```
+
+## Performance Considerations
+
+### Write Buffer
+
+The write buffer component batches database writes for better performance:
+- `maxSize`: Maximum number of messages before auto-flush (default: 1000)
+- `flushInterval`: Time-based flush interval in milliseconds (default: 5000)
+- `maxRetries`: Number of retry attempts for failed writes (default: 3)
+
+### Cache Configuration
+
+The cache component stores frequently accessed data:
+- `maxSize`: Maximum number of cached items (default: 10000)
+- `ttl`: Time to live for cached items in milliseconds (default: 3600000)
+
+## Troubleshooting
+
+### Common Issues
+
+1. **MQTT Connection Failed**
+   - Check MQTT broker is running
+   - Verify MQTT_URL environment variable
+   - Check network connectivity
+
+2. **Database Connection Failed**
+   - Check MySQL server is running
+   - Verify database credentials
+   - Check database exists
+
+3. **Messages Not Normalized**
+   - Check topic patterns match device topics
+   - Verify parser is registered for device type
+   - Check message format matches expected parser
+
+### Debug Mode
+
+Enable debug logging:
+```bash
+LOG_LEVEL=debug npm start
+```
 
 ## Contributing
 
 1. Fork the repository
-2. Create your feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a new Pull Request
+2. Create a feature branch
+3. Make your changes
+4. Add tests for new functionality
+5. Submit a pull request
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Support
+
+For support and questions:
+- Create an issue in the repository
+- Check the documentation in `MODULAR_ARCHITECTURE.md`

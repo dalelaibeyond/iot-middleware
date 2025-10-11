@@ -10,7 +10,7 @@ dotenv.config();
 
 // Import core modules
 const logger = require("./utils/logger");
-const Application = require("./modules/Application");
+const ModularApplication = require("./modules/ModularApplication");
 
 // Import routes
 const apiRoutes = require("./routes/api");
@@ -24,28 +24,30 @@ async function startServer() {
     const server = http.createServer(app);
     const PORT = process.env.PORT || 3000;
 
-    // Load configuration
-    const config = require("./config/config.json");
+    // Load modular configuration
+    const ModularConfigManager = require("./config/ModularConfigManager");
+    const configManager = new ModularConfigManager();
+    const config = configManager.getConfig();
 
     // Rate limiting
     const limiter = rateLimit({
-      windowMs: config.server.rateLimit.windowMs,
-      max: config.server.rateLimit.maxRequests,
+      windowMs: config.modules.api.components.rest.config.rateLimit.windowMs,
+      max: config.modules.api.components.rest.config.rateLimit.maxRequests,
     });
 
-    // Initialize application
-    const application = new Application({
+    // Initialize modular application
+    const application = new ModularApplication({
       server: server,
     });
     await application.initialize();
 
     // Register components with Express app for access in routes
-    app.set("wsServer", application.components.get("wsServer"));
-    app.set("writeBuffer", application.components.get("writeBuffer"));
+    app.set("wsServer", application.getComponent("websocket"));
+    app.set("writeBuffer", application.getComponent("writeBuffer"));
     app.set("application", application);
 
     // Middleware
-    app.use(compression(config.server.compression));
+    app.use(compression(config.modules.api.components.rest.config.compression));
     app.use(limiter);
     app.use(express.json());
     app.use(express.static(path.join(__dirname, "public")));
@@ -69,8 +71,8 @@ async function startServer() {
     });
 
     // Start server
-    server.listen(PORT, () => {
-      logger.info(`IoT Middleware v3 running at http://localhost:${PORT}`);
+    server.listen(config.server.port, config.server.host, () => {
+      logger.info(`IoT Middleware v3 running at http://${config.server.host}:${config.server.port}`);
     });
   } catch (error) {
     logger.error("Failed to start server:", error);

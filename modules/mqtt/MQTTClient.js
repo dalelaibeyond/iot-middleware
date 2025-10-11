@@ -14,7 +14,7 @@ class MQTTClient extends BaseComponent {
 
     return new Promise((resolve, reject) => {
       try {
-        this.client = mqtt.connect(this.options.url, this.config.mqtt.options);
+        this.client = mqtt.connect(this.options.url, this.options.options || {});
         this.setupEventHandlers(resolve, reject);
 
         // Set a timeout for connection
@@ -50,8 +50,12 @@ class MQTTClient extends BaseComponent {
 
     this.client.on("error", (error) => {
       this.logger.error("MQTT client error:", error);
-      if (!this.isConnected) {
+      // Don't reject on connection errors - allow the application to start without MQTT
+      if (!this.isConnected && error.code !== "ECONNREFUSED") {
         reject(error);
+      } else if (!this.isConnected) {
+        this.logger.warn("MQTT broker not available, continuing without MQTT");
+        resolve(); // Resolve anyway to allow application to start
       }
     });
 

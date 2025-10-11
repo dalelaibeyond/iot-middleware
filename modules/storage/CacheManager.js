@@ -13,9 +13,8 @@ class CacheManager extends BaseComponent {
 
   async initialize() {
     try {
-      const config = this.config.cache || {};
-      this.maxSize = config.maxSize || 10000;
-      this.ttl = config.ttl || 3600000; // 1 hour default
+      this.maxSize = this.options.maxSize || 10000;
+      this.ttl = this.options.ttl || 3600000; // 1 hour default
 
       // Start cleanup interval
       this.cleanupInterval = setInterval(() => this.cleanup(), 60000);

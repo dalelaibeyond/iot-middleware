@@ -1,0 +1,138 @@
+{
+  "modules": {
+    "core": {
+      "enabled": true,
+      "description": "Core functionality for MQTT message processing and normalization",
+      "components": {
+        "mqtt": {
+          "enabled": true,
+          "description": "MQTT client for receiving device messages",
+          "config": {
+            "url": "${MQTT_URL:mqtt://localhost:1883}",
+            "topics": ["V5008Upload/#", "V6800Upload/#", "G6000Upload/#"],
+            "options": {
+              "qos": 1,
+              "reconnectPeriod": 5000,
+              "keepalive": 60
+            }
+          }
+        },
+        "normalizer": {
+          "enabled": true,
+          "description": "Central message normalizer with device-specific parsers",
+          "config": {
+            "parsers": ["v5008", "v6800", "g6000"],
+            "fallbackEnabled": true
+          }
+        },
+        "dataStore": {
+          "enabled": true,
+          "description": "In-memory storage for normalized messages",
+          "config": {
+            "expireTime": 3600000,
+            "cleanupInterval": 300000
+          }
+        }
+      }
+    },
+    "storage": {
+      "enabled": true,
+      "description": "Persistent storage options for sensor data",
+      "components": {
+        "database": {
+          "enabled": true,
+          "description": "MySQL database for persistent storage",
+          "config": {
+            "connectionPool": {
+              "waitForConnections": true,
+              "connectionLimit": 10,
+              "queueLimit": 0
+            }
+          }
+        },
+        "cache": {
+          "enabled": true,
+          "description": "In-memory caching for frequently accessed data",
+          "config": {
+            "maxSize": 10000,
+            "ttl": 3600000
+          }
+        },
+        "writeBuffer": {
+          "enabled": true,
+          "description": "Buffered writing to database for performance",
+          "config": {
+            "maxSize": 100,
+            "flushInterval": 1000,
+            "maxRetries": 3
+          }
+        }
+      }
+    },
+    "api": {
+      "enabled": true,
+      "description": "API endpoints for external access to sensor data",
+      "components": {
+        "rest": {
+          "enabled": true,
+          "description": "RESTful API for HTTP access",
+          "config": {
+            "rateLimit": {
+              "windowMs": 900000,
+              "maxRequests": 100
+            },
+            "compression": {
+              "level": 6,
+              "threshold": "1kb"
+            }
+          }
+        },
+        "websocket": {
+          "enabled": true,
+          "description": "WebSocket API for real-time updates",
+          "config": {
+            "heartbeatInterval": 30000
+          }
+        },
+        "webhook": {
+          "enabled": false,
+          "description": "Webhook API for push notifications",
+          "config": {
+            "retryLimit": 3,
+            "retryDelay": 1000
+          }
+        }
+      }
+    },
+    "relay": {
+      "enabled": true,
+      "description": "Message relay for forwarding normalized messages",
+      "components": {
+        "messageRelay": {
+          "enabled": true,
+          "description": "Relay normalized messages to MQTT broker",
+          "config": {
+            "brokerUrl": "${RELAY_MQTT_URL:mqtt://localhost:1883}",
+            "patterns": {
+              "V5008Upload": "dig/sensors/${gatewayId}",
+              "V6800Upload": "dig/sensors/${gatewayId}",
+              "G6000Upload": "dig/sensors/${gatewayId}"
+            }
+          }
+        }
+      }
+    }
+  },
+  "server": {
+    "port": "${PORT:3000}",
+    "host": "0.0.0.0"
+  },
+  "logger": {
+    "level": "${LOG_LEVEL:info}",
+    "file": {
+      "dir": "logs",
+      "filename": "app.log"
+    },
+    "format": "[{timestamp}] {level} {message}"
+  }
+}

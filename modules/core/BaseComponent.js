@@ -1,9 +1,8 @@
-const configManager = require("../../config/ConfigManager");
 const logger = require("../../utils/logger");
 
 class BaseComponent {
   constructor(options = {}) {
-    this.config = configManager;
+    this.config = options.config || {};
     this.logger = logger;
     this.options = options;
   }

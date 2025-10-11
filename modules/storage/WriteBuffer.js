@@ -9,14 +9,14 @@ class WriteBuffer extends BaseComponent {
 
   async initialize() {
     try {
-      const config = this.config.writeBuffer;
-      this.maxSize = config.maxSize || 1000;
-      this.flushInterval = config.flushInterval || 5000;
-      this.maxRetries = config.maxRetries || 3;
+      // Configuration is now passed directly in options
+      this.maxSize = this.options.maxSize || 1000;
+      this.flushInterval = this.options.flushInterval || 5000;
+      this.maxRetries = this.options.maxRetries || 3;
 
       // Start periodic flush
       this.timer = setInterval(() => this.flush(), this.flushInterval);
-      this.logger.info("WriteBuffer initialized");
+      this.logger.debug("WriteBuffer initialized");
     } catch (error) {
       this.logger.error("Failed to initialize WriteBuffer:", error);
       throw error;
@@ -24,6 +24,11 @@ class WriteBuffer extends BaseComponent {
   }
 
   async push(data) {
+    if (!this.options.dbStore || !this.options.dbStore.isEnabled) {
+      this.logger.debug("Database not available, skipping write buffer push");
+      return;
+    }
+    
     this.buffer.push(data);
     this.logger.debug(
       `Added to write buffer. Current size: ${this.buffer.length}`
@@ -36,6 +41,11 @@ class WriteBuffer extends BaseComponent {
 
   async flush() {
     if (this.isFlushing || this.buffer.length === 0) return;
+    
+    if (!this.options.dbStore || !this.options.dbStore.isEnabled) {
+      this.logger.debug("Database not available, skipping write buffer flush");
+      return;
+    }
 
     this.isFlushing = true;
     const batchToFlush = [...this.buffer];
@@ -55,7 +65,6 @@ class WriteBuffer extends BaseComponent {
   async _saveBatch(batch, retryCount = 0) {
     try {
       await this.options.dbStore.saveBatch(batch);
-      this.logger.debug(`Successfully flushed ${batch.length} records`);
     } catch (error) {
       if (retryCount < this.maxRetries) {
         this.logger.warn(

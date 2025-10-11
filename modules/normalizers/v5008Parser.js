@@ -12,54 +12,12 @@ function parse(topic, message, meta = {}) {
     const gatewayId = topicParts[1] || "unknown";
     const sensorType = topicParts[2] || "unknown";
 
-    // Handle different message formats
-    let rawHexString;
-    if (Buffer.isBuffer(message)) {
-      // Message is a Buffer - check if it contains hex string text or actual byte code
-      const messageStr = message.toString();
+    // Debug: Log buffer information
+    logger.debug(`[V5008 PARSER] Buffer length: ${message.length}`);
+    logger.debug(`[V5008 PARSER] Buffer content (hex): ${message.toString("hex")}`);
 
-      // Check if the string contains only hex characters (0-9, A-F)
-      const isHexString = /^[0-9A-Fa-f]+$/.test(messageStr);
-
-      if (isHexString) {
-        // Buffer contains hex string text - use as-is
-        rawHexString = messageStr.toUpperCase();
-      } else {
-        // Buffer contains actual byte code - convert to hex
-        rawHexString = message.toString("hex").toUpperCase();
-      }
-    } else if (message && message.payload && Buffer.isBuffer(message.payload)) {
-      // Message has a payload property that is a Buffer
-      const payloadStr = message.payload.toString();
-
-      // Check if the string contains only hex characters (0-9, A-F)
-      const isHexString = /^[0-9A-Fa-f]+$/.test(payloadStr);
-
-      if (isHexString) {
-        // Buffer contains hex string text - use as-is
-        rawHexString = payloadStr.toUpperCase();
-      } else {
-        // Buffer contains actual byte code - convert to hex
-        rawHexString = message.payload.toString("hex").toUpperCase();
-      }
-    } else {
-      // Message is a string - check if it's already a hex string
-      const messageStr =
-        typeof message === "string" ? message : message.toString();
-
-      // Check if the string contains only hex characters (0-9, A-F)
-      const isHexString = /^[0-9A-Fa-f]+$/.test(messageStr);
-
-      if (isHexString) {
-        // Already a hex string - use as-is
-        rawHexString = messageStr.toUpperCase();
-      } else {
-        // Not a hex string - convert to hex
-        rawHexString = Buffer.from(messageStr, "utf8")
-          .toString("hex")
-          .toUpperCase();
-      }
-    }
+    // V5008 messages are always buffers, convert directly to hex string
+    const rawHexString = message.toString("hex").toUpperCase();
 
     // TODO: Implement hex string parsing logic here
     // This will extract sensorAdd, sensorId, and actual sensor data from the hex string

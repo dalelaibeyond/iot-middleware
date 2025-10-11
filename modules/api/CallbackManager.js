@@ -23,8 +23,8 @@ class CallbackManager extends BaseComponent {
     const callbackId = this.generateCallbackId();
     this.callbacks.set(callbackId, {
       url,
-      retryLimit: options.retryLimit || this.config.callbacks.retryLimit,
-      retryDelay: options.retryDelay || this.config.callbacks.retryDelay,
+      retryLimit: options.retryLimit || this.options.retryLimit || 3,
+      retryDelay: options.retryDelay || this.options.retryDelay || 1000,
     });
     return callbackId;
   }

@@ -5,10 +5,14 @@ class DatabaseManager extends BaseComponent {
   constructor(options = {}) {
     super(options);
     this.pool = null;
-    this.isEnabled = this.config.database.enabled;
+    // Database is enabled by default, will be updated in initialize
+    this.isEnabled = true;
   }
 
   async initialize() {
+    // Check if database is enabled in configuration
+    this.isEnabled = this.options.enabled !== false;
+    
     if (!this.isEnabled) {
       this.logger.info("Database storage is disabled in configuration");
       return;
@@ -17,10 +21,14 @@ class DatabaseManager extends BaseComponent {
     try {
       this.pool = await this.createPool();
       await this.testConnection();
+      await this.testTable();
       this.logger.info("Database connection established successfully");
     } catch (error) {
       this.logger.error("Failed to initialize database:", error);
-      throw error;
+      // Don't fail the entire application if database is not available
+      this.logger.warn("Database not available, continuing without database storage");
+      this.pool = null;
+      this.isEnabled = false;
     }
   }
 
@@ -30,7 +38,7 @@ class DatabaseManager extends BaseComponent {
       user: process.env.DB_USER || "root",
       password: process.env.DB_PASS || "",
       database: process.env.DB_NAME || "iot_middleware",
-      ...this.config.database.connectionPool,
+      ...this.options.connectionPool,
     });
   }
 
@@ -43,9 +51,23 @@ class DatabaseManager extends BaseComponent {
     }
   }
 
+  async testTable() {
+    try {
+      const result = await this.query("SHOW TABLES LIKE 'sensor_data'");
+      if (result.length === 0) {
+        this.logger.error("sensor_data table does not exist in database");
+        throw new Error("sensor_data table not found");
+      }
+    } catch (error) {
+      this.logger.error("Error checking for sensor_data table:", error);
+      throw error;
+    }
+  }
+
   async query(sql, params = []) {
-    if (!this.isEnabled) {
-      throw new Error("Database operations are disabled");
+    if (!this.isEnabled || !this.pool) {
+      this.logger.debug("Database operations are disabled or not connected");
+      return [];
     }
 
     try {
@@ -58,8 +80,9 @@ class DatabaseManager extends BaseComponent {
   }
 
   async transaction(callback) {
-    if (!this.isEnabled) {
-      throw new Error("Database operations are disabled");
+    if (!this.isEnabled || !this.pool) {
+      this.logger.debug("Database operations are disabled or not connected");
+      return null;
     }
 
     const connection = await this.pool.getConnection();
@@ -89,8 +112,8 @@ class DatabaseManager extends BaseComponent {
    * Save a batch of messages to the database
    */
   async saveBatch(messages) {
-    if (!this.isEnabled) {
-      this.logger.debug("Database disabled, skipping batch save");
+    if (!this.isEnabled || !this.pool) {
+      this.logger.debug("Database disabled or not connected, skipping batch save");
       return;
     }
 
@@ -98,27 +121,33 @@ class DatabaseManager extends BaseComponent {
       return;
     }
 
+    // Create placeholders for each message
+    const placeholders = messages.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").join(", ");
+    
     const sql = `
             INSERT INTO sensor_data (device_id, device_type, sensor_add, sensor_port, sensor_id, sensor_type, timestamp, payload, meta, created_at)
-            VALUES ?
+            VALUES ${placeholders}
         `;
 
-    const values = messages.map((msg) => [
-      msg.deviceId,
-      msg.deviceType || "unknown",
-      msg.sensorAdd || null,
-      msg.sensorPort || null,
-      msg.sensorId || `${msg.deviceId}-unknown`,
-      msg.sensorType || "unknown",
-      this.toMySQLDateTime(msg.ts),
-      JSON.stringify(msg.payload || {}),
-      JSON.stringify(msg.meta || {}),
-      this.toMySQLDateTime(),
-    ]);
+    // Flatten all values into a single array
+    const values = [];
+    messages.forEach((msg) => {
+      values.push(
+        msg.deviceId,
+        msg.deviceType || "unknown",
+        msg.sensorAdd || null,
+        msg.sensorPort || null,
+        msg.sensorId || `${msg.deviceId}-unknown`,
+        msg.sensorType || "unknown",
+        this.toMySQLDateTime(msg.ts),
+        JSON.stringify(msg.payload || {}),
+        JSON.stringify(msg.meta || {}),
+        this.toMySQLDateTime()
+      );
+    });
 
     try {
-      await this.query(sql, [values]);
-      this.logger.debug(`Saved batch of ${messages.length} messages`);
+      await this.query(sql, values);
     } catch (error) {
       this.logger.error("Error saving batch:", error);
       throw error;
@@ -129,8 +158,8 @@ class DatabaseManager extends BaseComponent {
    * Save a single message to the database
    */
   async saveHistory(message) {
-    if (!this.isEnabled) {
-      this.logger.debug("Database disabled, skipping save");
+    if (!this.isEnabled || !this.pool) {
+      this.logger.debug("Database disabled or not connected, skipping save");
       return;
     }
 
@@ -154,7 +183,6 @@ class DatabaseManager extends BaseComponent {
 
     try {
       await this.query(sql, values);
-      this.logger.debug(`Saved message for device ${message.deviceId}`);
     } catch (error) {
       this.logger.error("Error saving message:", error);
       throw error;
@@ -265,6 +293,40 @@ class DatabaseManager extends BaseComponent {
       await this.pool.end();
     }
     super.shutdown();
+  }
+
+  // Test method to save a single message directly
+  async testSaveMessage() {
+    if (!this.isEnabled || !this.pool) {
+      return false;
+    }
+
+    const testMessage = {
+      deviceId: "test-device-001",
+      deviceType: "V5008",
+      sensorAdd: null,
+      sensorPort: null,
+      sensorId: "test-device-001-temperature",
+      sensorType: "temperature",
+      ts: new Date().toISOString(),
+      payload: {
+        rawHexString: "TEST123456",
+        temperature: 25.5
+      },
+      meta: {
+        rawTopic: "V5008Upload/test-device-001/temperature",
+        deviceType: "V5008",
+        test: true
+      }
+    };
+
+    try {
+      await this.saveHistory(testMessage);
+      return true;
+    } catch (error) {
+      this.logger.error("Failed to save test message:", error);
+      return false;
+    }
   }
 }
 
