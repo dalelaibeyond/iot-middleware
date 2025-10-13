@@ -21,9 +21,9 @@ function parse(topic, message, meta = {}) {
     const parsedData = {
       deviceId: gatewayId,
       deviceType: deviceType,
-      sensorAdd: null, // Will be determined after hex parsing
-      sensorPort: null, // Not applicable for G6000
-      sensorId: `${gatewayId}-${sensorType}`, // Default sensor ID, will be updated after hex parsing
+      modAdd: null, // Will be determined after hex parsing
+      modPort: null, // Not applicable for G6000
+      modId: `${gatewayId}-${sensorType}`, // Default sensor ID, will be updated after hex parsing
       sensorType: sensorType,
       ts: new Date().toISOString(),
       payload: {

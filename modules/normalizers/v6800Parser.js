@@ -37,9 +37,9 @@ function parse(topic, message, meta = {}) {
     const parsedData = {
       deviceId: gatewayId,
       deviceType: deviceType,
-      sensorAdd: null, // Not applicable for V6800
-      sensorPort: payload.port || null, // Extract port from payload
-      sensorId: payload.sensorId || `${gatewayId}-${detectedSensorType}`, // Use payload sensorId or create default
+      modAdd: null, // Not applicable for V6800
+      modPort: payload.port || null, // Extract port from payload
+      modId: payload.sensorId || `${gatewayId}-${detectedSensorType}`, // Use payload sensorId or create default
       sensorType: detectedSensorType,
       ts: payload.time
         ? new Date(payload.time).toISOString()

@@ -27,9 +27,9 @@ function parse(topic, message, meta = {}) {
     const parsedData = {
       deviceId: gatewayId,
       deviceType: deviceType,
-      sensorAdd: null, // TODO: Extract from hex string
-      sensorPort: null, // Not applicable for V5008
-      sensorId: `${gatewayId}-${sensorType}`, // TODO: Extract from hex string
+      modAdd: null, // TODO: Extract from hex string
+      modPort: null, // Not applicable for V5008
+      modId: `${gatewayId}-${sensorType}`, // TODO: Extract from hex string
       sensorType: sensorType,
       ts: new Date().toISOString(),
       payload: {
