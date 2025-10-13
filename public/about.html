@@ -76,6 +76,8 @@
                 <li>Intelligent Message Batching</li>
                 <li>Rate Limiting and Circuit Breaking</li>
                 <li>Memory-Aware Operations</li>
+                <li>Optimized Database Connection Pooling</li>
+                <li>Adaptive Write Buffering</li>
             </ul>
         </p>
 
@@ -87,6 +89,31 @@
                 <li>Plugin System for extensible functionality</li>
                 <li>Message Processing Pipeline with middleware support</li>
                 <li>Dynamic module loading and configuration</li>
+                <li>Fault-tolerant component initialization</li>
+            </ul>
+        </p>
+
+        <h3>Security Features</h3>
+        <p>
+            Enterprise-grade security capabilities:
+            <ul>
+                <li>JWT-based Authentication and Authorization</li>
+                <li>Input Validation and Sanitization</li>
+                <li>Role-based Access Control (RBAC)</li>
+                <li>API Rate Limiting</li>
+                <li>CORS Configuration</li>
+            </ul>
+        </p>
+
+        <h3>Monitoring & Observability</h3>
+        <p>
+            Comprehensive monitoring capabilities:
+            <ul>
+                <li>Prometheus-compatible Metrics Collection</li>
+                <li>Real-time Alerting System</li>
+                <li>Component Health Monitoring</li>
+                <li>Performance Metrics Tracking</li>
+                <li>Distributed Tracing Support</li>
             </ul>
         </p>
 
@@ -205,66 +232,86 @@ module.exports = {
 
     <h2>System Architecture</h2>
     <div class="section">
-        <h3>High-Performance Architecture</h3>
+        <h3>Modular Architecture</h3>
         <div class="mermaid">
         flowchart TB
-            MQTT[MQTT Broker] --> RL[Rate Limiter]
-            RL --> MH[MQTT Handler]
-            MH --> EB{Event Bus}
-            EB --> WP[Worker Pool]
-            WP --> W1[Worker 1]
-            WP --> W2[Worker 2]
-            WP --> W3[Worker N]
-            W1 & W2 & W3 --> BM[Batch Manager]
-            BM --> DB[(Database)]
+            MQTT[MQTT Broker] --> APP[ModularApplication]
+            APP --> CR[ComponentRegistry]
             
-            subgraph Processing Layer
-                WP
-                W1
-                W2
-                W3
+            subgraph Core Module
+                CR --> MQTT_CLIENT[MQTT Client]
+                CR --> NORM[Normalizer]
+                CR --> DS[DataStore]
             end
             
-            subgraph Resilience
-                RL
-                CB[Circuit Breaker]
+            subgraph Storage Module
+                CR --> DB[Database]
+                CR --> CACHE[Cache]
+                CR --> WB[Write Buffer]
             end
             
-            P1 --> DS[Data Store]
-            P2 --> WB[Write Buffer]
-            P3 --> WS[WebSocket]
+            subgraph API Module
+                CR --> REST[REST API]
+                CR --> WS[WebSocket]
+                CR --> WEBHOOK[Webhook]
+            end
+            
+            subgraph Relay Module
+                CR --> RELAY[Message Relay]
+                RELAY --> MQTT
+            end
+            
+            subgraph Security Module
+                CR --> AUTH[Auth Manager]
+                CR --> VALIDATOR[Input Validator]
+                AUTH --> REST
+                AUTH --> WS
+            end
+            
+            subgraph Monitoring Module
+                CR --> METRICS[Metrics Collector]
+                CR --> ALERTS[Alert Manager]
+                METRICS --> PROMETHEUS[Prometheus]
+            end
+            
+            subgraph Processing Module
+                CR --> DATA_VAL[Data Validator]
+                CR --> TRANSFORMER[Data Transformer]
+                NORM --> DATA_VAL
+                DATA_VAL --> TRANSFORMER
+            end
+            
+            subgraph Resilience Module
+                CR --> CIRCUIT[Circuit Breaker]
+                CR --> RETRY[Retry Manager]
+                DB --> CIRCUIT
+                CIRCUIT --> RETRY
+            end
+            
+            WB --> DB
             DS --> API[REST API]
-            WB --> DB[(MySQL)]
-            WS --> Client[Clients]
+            WS --> CLIENT[WebSocket Clients]
         </div>
 
         <h3>Message Processing Pipeline</h3>
         <div class="mermaid">
         flowchart LR
-            M[Message] --> MW1[Middleware 1]
-            MW1 --> MW2[Middleware 2]
-            MW2 --> MW3[Middleware 3]
-            MW3 --> R[Result]
-            
-            subgraph Pipeline
-                MW1
-                MW2
-                MW3
-            end
-        </div>
-
-        <h3>Write Buffer Process</h3>
-        <div class="mermaid">
-        flowchart LR
-            D[Data] --> WB[Write Buffer]
-            WB --> C{Check Size}
-            C -->|>= maxSize| F[Flush to DB]
-            C -->|< maxSize| W[Wait]
-            W --> T[Timer]
-            T -->|flushInterval| F
-            F --> R{Retry?}
-            R -->|Yes| F
-            R -->|No| E[Error Handler]
+            M[MQTT Message] --> AUTH[Auth Check]
+            AUTH --> VALID[Input Validation]
+            VALID --> APP[ModularApplication]
+            APP --> NORM[Normalizer]
+            NORM --> DATA_VAL[Data Validation]
+            DATA_VAL --> TRANSFORM[Data Transformation]
+            TRANSFORM --> DS[DataStore]
+            TRANSFORM --> CACHE[Cache]
+            TRANSFORM --> WB[Write Buffer]
+            TRANSFORM --> WS[WebSocket]
+            TRANSFORM --> RELAY[Message Relay]
+            TRANSFORM --> METRICS[Metrics Collection]
+            WB --> CIRCUIT[Circuit Breaker]
+            CIRCUIT --> RETRY[Retry Manager]
+            RETRY --> DB[(Database)]
+            METRICS --> ALERTS[Alert Manager]
         </div>
     </div>
 
@@ -302,34 +349,84 @@ module.exports = {
 
     <h2>Configuration</h2>
     <div class="section">
-        <h3>System Configuration</h3>
-        <table class="config-table">
-            <tr>
-                <th>Component</th>
-                <th>Configuration</th>
-                <th>Description</th>
-            </tr>
-            <tr>
-                <td>MQTT</td>
-                <td>topics, QoS, reconnection</td>
-                <td>Multiple topic subscriptions, connection settings</td>
-            </tr>
-            <tr>
-                <td>Write Buffer</td>
-                <td>size, interval, retries</td>
-                <td>Database write optimization settings</td>
-            </tr>
-            <tr>
-                <td>Callbacks</td>
-                <td>retry limit, delay</td>
-                <td>HTTP notification retry settings</td>
-            </tr>
-            <tr>
-                <td>Server</td>
-                <td>rate limits, compression</td>
-                <td>API protection and optimization</td>
-            </tr>
-        </table>
+        <h3>Module Configuration</h3>
+        <p>
+            The system is configured through modular-config.json:
+        </p>
+        <pre><code>{
+  "modules": {
+    "core": {
+      "enabled": true,
+      "description": "Core functionality for MQTT message processing",
+      "components": {
+        "mqtt": { "enabled": true },
+        "normalizer": { "enabled": true },
+        "dataStore": { "enabled": true }
+      }
+    },
+    "storage": {
+      "enabled": true,
+      "description": "Persistent storage options",
+      "components": {
+        "database": { "enabled": true },
+        "cache": { "enabled": true },
+        "writeBuffer": { "enabled": true }
+      }
+    },
+    "api": {
+      "enabled": true,
+      "description": "API endpoints for external access",
+      "components": {
+        "rest": { "enabled": true },
+        "websocket": { "enabled": true },
+        "webhook": { "enabled": false }
+      }
+    },
+    "relay": {
+      "enabled": true,
+      "description": "Message relay for forwarding",
+      "components": {
+        "messageRelay": { "enabled": true }
+      }
+    },
+    "security": {
+      "enabled": false,
+      "description": "Security and authentication",
+      "components": {
+        "authManager": { "enabled": false },
+        "inputValidator": { "enabled": false }
+      }
+    },
+    "monitoring": {
+      "enabled": false,
+      "description": "Monitoring and observability",
+      "components": {
+        "metricsCollector": { "enabled": false },
+        "alertManager": { "enabled": false }
+      }
+    },
+    "processing": {
+      "enabled": false,
+      "description": "Data processing pipeline",
+      "components": {
+        "dataValidator": { "enabled": false },
+        "dataTransformer": { "enabled": false }
+      }
+    },
+    "resilience": {
+      "enabled": false,
+      "description": "Error handling and recovery",
+      "components": {
+        "circuitBreaker": { "enabled": false },
+        "retryManager": { "enabled": false }
+      }
+    }
+  }
+}</code></pre>
+        <p>
+            Each module can be enabled/disabled independently, providing flexible deployment options.
+            New modules (security, monitoring, processing, resilience) can be enabled as needed.
+        </p>
     </div>
 
     <h2>API Documentation</h2>
@@ -347,33 +444,29 @@ module.exports = {
 
     <h2>Message Format</h2>
     <div class="section">
-        <h3>Input Example (Raw MQTT Message)</h3>
+        <h3>V5008 Device Input (Raw Buffer)</h3>
         <pre>
-{
-  "devId": "A-Temp-001",
-  "rackNo": "42",
-  "posU": "18",
-  "tmp": 27.3,
-  "unit": "C",
-  "time": 1695653130000
-}</pre>
+Buffer containing hex data: BB028C0909950012010200DD2874847E00312F</pre>
 
         <h3>Normalized Format</h3>
         <pre>
 {
-  "deviceId": "string",        // unique device id
-  "sensorType": "string",      // e.g. "temperature"
-  "ts": "2025-09-24T08:12:23.456Z", // ISO8601 UTC timestamp
-  "seq": 12345,                // optional sequence number
-  "payload": {                 // sensor-specific data
-     "temp": 28.3,
-     "unit": "C",
-     "rackNo": "42",
-     "posU": "18"
+  "deviceId": "2437871205",    // gateway ID from topic
+  "deviceType": "V5008",        // device type from topic
+  "sensorId": "2437871205-LabelState", // combined ID
+  "sensorType": "LabelState",   // sensor type from topic
+  "ts": "2025-10-11T09:26:49.234Z", // ISO8601 UTC timestamp
+  "payload": {                 // device-specific data
+     "rawHexString": "BB028C0909950012010200DD2874847E00312F"
   },
   "meta": {                    // metadata
-     "rawTopic": "sensors/gateway-1/temp",
-     "gatewayId": "gateway-1"
+     "rawTopic": "V5008Upload/2437871205/LabelState",
+     "rawHexString": "BB028C0909950012010200DD2874847E00312F",
+     "deviceType": "V5008",
+     "topic": "V5008Upload/2437871205/LabelState",
+     "normalizedBy": "V5008",
+     "normalizedAt": "2025-10-11T09:26:49.235Z",
+     "parserVersion": "1.0.0"
   }
 }</pre>
     </div>

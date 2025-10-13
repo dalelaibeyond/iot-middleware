@@ -1,235 +1,621 @@
-# IoT Middleware v3 - Modular Architecture
+# IoT Middleware v3 - Modular Architecture Guide
 
-This document describes the new modular architecture implemented for the IoT Middleware v3.
+## Table of Contents
 
-## Overview
+1. [Architecture Overview](#architecture-overview)
+2. [Core Components](#core-components)
+3. [Module System](#module-system)
+4. [Event-Driven Communication](#event-driven-communication)
+5. [Component Lifecycle](#component-lifecycle)
+6. [Data Flow](#data-flow)
+7. [Configuration System](#configuration-system)
+8. [Extensibility Points](#extensibility-points)
+9. [Design Patterns](#design-patterns)
+10. [Implementation Guidelines](#implementation-guidelines)
 
-The IoT Middleware has been refactored to support a highly modular architecture where components can be enabled or disabled through configuration. This allows for greater flexibility and easier maintenance.
+## Architecture Overview
 
-## Architecture Components
+IoT Middleware v3 is built on a modular, event-driven architecture that enables flexible deployment and easy extension. The system is composed of independent modules that communicate through a central event bus, ensuring loose coupling and high maintainability.
 
-### 1. Configuration Management
+### Key Architectural Principles
 
-#### ModularConfigManager
-- Location: `config/ModularConfigManager.js`
-- Purpose: Manages the modular configuration structure with support for environment variables
-- Configuration File: `config/modular-config.json`
+1. **Modularity**: Each functional area is encapsulated in its own module
+2. **Loose Coupling**: Components communicate through events, not direct references
+3. **Configuration-Driven**: Behavior is controlled through configuration, not code changes
+4. **Fault Tolerance**: System continues operating even when optional components fail
+5. **Extensibility**: New functionality can be added without modifying existing code
 
-#### Configuration Structure
-```json
-{
-  "modules": {
-    "core": {
-      "enabled": true,
-      "components": {
-        "mqtt": { "enabled": true },
-        "normalizer": { "enabled": true },
-        "dataStore": { "enabled": true }
-      }
-    },
-    "storage": {
-      "enabled": true,
-      "components": {
-        "database": { "enabled": true },
-        "cache": { "enabled": true }
-      }
-    },
-    "api": {
-      "enabled": true,
-      "components": {
-        "rest": { "enabled": true },
-        "websocket": { "enabled": true },
-        "webhook": { "enabled": false }
-      }
-    },
-    "relay": {
-      "enabled": true,
-      "components": {
-        "messageRelay": { "enabled": true }
-      }
-    }
+## Core Components
+
+### 1. ModularApplication
+
+The main application class that orchestrates all modules and components.
+
+**Location**: `modules/ModularApplication.js`
+
+**Key Responsibilities**:
+- Initialize and coordinate all modules
+- Handle high-level event routing
+- Provide component access interface
+- Manage application lifecycle
+
+```javascript
+class ModularApplication extends BaseComponent {
+  constructor(options = {}) {
+    super(options);
+    this.configManager = null;
+    this.componentRegistry = null;
+    this.isInitialized = false;
   }
 }
 ```
 
-### 2. Component Registry
+### 2. ComponentRegistry
 
-#### ComponentRegistry
-- Location: `modules/core/ComponentRegistry.js`
-- Purpose: Manages component lifecycle, initialization, and dependencies
-- Features:
-  - Automatic component initialization based on configuration
-  - Dependency injection
-  - Component factory pattern
-  - Ordered initialization
+Manages the registration, initialization, and lifecycle of all components.
 
-### 3. Modular Application
+**Location**: `modules/core/ComponentRegistry.js`
 
-#### ModularApplication
-- Location: `modules/ModularApplication.js`
-- Purpose: Main application class that uses the ComponentRegistry
-- Replaces: The original `Application.js`
-- Features:
-  - Event-driven architecture
-  - Modular message processing
-  - Component access through registry
+**Key Responsibilities**:
+- Register component factories
+- Initialize components in dependency order
+- Manage component lifecycle
+- Provide component access methods
 
-### 4. Enhanced Normalizer
-
-#### NormalizerRegistry
-- Location: `modules/normalizers/NormalizerRegistry.js`
-- Purpose: Manages device-specific normalizers as plugins
-- Features:
-  - Dynamic parser registration
-  - Parser versioning
-  - Fallback handling for unknown device types
-
-### 5. API Management
-
-#### RestAPIManager
-- Location: `modules/api/RestAPIManager.js`
-- Purpose: Manages all REST API endpoints
-- Features:
-  - Centralized route management
-  - Component-aware endpoints
-  - Statistics and monitoring
-
-## Module Groups
-
-### Group 1: Core (MUST)
-- **mqtt**: MQTT client for receiving device messages
-- **normalizer**: Central message normalizer with device-specific parsers
-- **dataStore**: In-memory storage for normalized messages
-
-### Group 2: Storage (Optional)
-- **database**: MySQL database for persistent storage
-- **cache**: In-memory caching for frequently accessed data
-- **writeBuffer**: Buffered writing to database
-
-### Group 3: API (Optional)
-- **rest**: RESTful API for HTTP access
-- **websocket**: WebSocket API for real-time updates
-- **webhook**: Webhook API for push notifications
-
-### Group 4: Relay (Optional)
-- **messageRelay**: Relay normalized messages to MQTT broker
-
-## Usage
-
-### Starting the Application
-```bash
-npm start
+```javascript
+class ComponentRegistry {
+  constructor(config, options = {}) {
+    this.config = config;
+    this.options = options;
+    this.components = new Map();
+    this.componentFactories = new Map();
+    this.initializationOrder = [];
+  }
+}
 ```
 
-### Environment Variables
-- `PORT`: Server port (default: 3000)
-- `MQTT_URL`: MQTT broker URL (default: mqtt://localhost:1883)
-- `DB_HOST`: Database host (default: localhost)
-- `DB_USER`: Database user (default: root)
-- `DB_PASS`: Database password (default: empty)
-- `DB_NAME`: Database name (default: iot_middleware)
-- `LOG_LEVEL`: Logging level (default: info)
+### 3. EventBus
 
-### Configuration Changes
-To enable/disable modules or components, modify `config/modular-config.json`:
+Central communication hub for all components using the publish-subscribe pattern.
+
+**Location**: `modules/core/eventBus.js`
+
+**Key Responsibilities**:
+- Route events between components
+- Maintain event listeners
+- Provide event subscription/unsubscription
+
+```javascript
+class EventBus extends EventEmitter {
+  constructor() {
+    super();
+    this.setMaxListeners(0); // Unlimited listeners
+  }
+}
+```
+
+### 4. BaseComponent
+
+Abstract base class that all components must extend.
+
+**Location**: `modules/core/BaseComponent.js`
+
+**Key Responsibilities**:
+- Provide common component interface
+- Implement default lifecycle methods
+- Offer utility functions for validation
+
+```javascript
+class BaseComponent {
+  constructor(options = {}) {
+    this.config = options.config || {};
+    this.logger = logger;
+    this.options = options;
+  }
+}
+```
+
+## Module System
+
+The middleware is organized into 8 module groups, each with specific responsibilities:
+
+### 1. Core Module (Required)
+
+Essential components for basic functionality.
+
+**Components**:
+- **MQTT Client** (`modules/mqtt/MQTTClient.js`)
+  - Connects to MQTT broker
+  - Subscribes to device topics
+  - Publishes messages
+
+- **Normalizer** (`modules/normalizers/`)
+  - Normalizes incoming messages
+  - Manages device-specific parsers
+  - Provides unified message format
+
+- **Data Store** (`modules/storage/dataStore.js`)
+  - In-memory storage for recent data
+  - Provides fast access to latest readings
+  - Manages data expiration
+
+### 2. Storage Module (Optional)
+
+Persistent storage and caching components.
+
+**Components**:
+- **Database** (`modules/database/DatabaseManager.js`)
+  - MySQL database connection
+  - Query execution
+  - Transaction management
+
+- **Cache** (`modules/storage/CacheManager.js`)
+  - In-memory caching
+  - TTL-based expiration
+  - LRU eviction policy
+
+- **Write Buffer** (`modules/storage/WriteBuffer.js`)
+  - Batches database writes
+  - Improves performance
+  - Handles retry logic
+
+### 3. API Module (Optional)
+
+External access interfaces.
+
+**Components**:
+- **REST API** (`modules/api/RestAPIManager.js`)
+  - HTTP endpoints for data access
+  - Request validation
+  - Response formatting
+
+- **WebSocket** (`modules/api/WebSocketServer.js`)
+  - Real-time data streaming
+  - Client connection management
+  - Message broadcasting
+
+- **Webhook** (`modules/api/CallbackManager.js`)
+  - HTTP callback notifications
+  - Retry mechanism
+  - Event filtering
+
+### 4. Relay Module (Optional)
+
+Message forwarding and distribution.
+
+**Components**:
+- **Message Relay** (`modules/mqtt/messageRelay.js`)
+  - Forwards normalized messages
+  - Topic transformation
+  - Selective relay rules
+
+### 5. Security Module (Optional)
+
+Authentication and authorization features.
+
+**Components**:
+- **Auth Manager** (`modules/security/AuthManager.js`)
+  - JWT token management
+  - User authentication
+  - Role-based access control
+
+- **Input Validator** (`modules/security/InputValidator.js`)
+  - Request validation
+  - Data sanitization
+  - Schema validation
+
+### 6. Monitoring Module (Optional)
+
+Observability and alerting capabilities.
+
+**Components**:
+- **Metrics Collector** (`modules/monitoring/MetricsCollector.js`)
+  - Prometheus metrics
+  - Performance tracking
+  - Resource monitoring
+
+- **Alert Manager** (`modules/monitoring/AlertManager.js`)
+  - Rule-based alerting
+  - Notification channels
+  - Alert aggregation
+
+### 7. Processing Module (Optional)
+
+Data transformation and validation pipeline.
+
+**Components**:
+- **Data Validator** (`modules/processing/DataValidator.js`)
+  - Schema validation
+  - Data quality checks
+  - Business rule validation
+
+- **Data Transformer** (`modules/processing/DataTransformer.js`)
+  - Message transformation
+  - Data enrichment
+  - Format conversion
+
+### 8. Resilience Module (Optional)
+
+Error handling and recovery mechanisms.
+
+**Components**:
+- **Circuit Breaker** (`modules/resilience/CircuitBreaker.js`)
+  - Fault detection
+  - Automatic failover
+  - Recovery monitoring
+
+- **Retry Manager** (`modules/resilience/RetryManager.js`)
+  - Exponential backoff
+  - Retry policies
+  - Dead letter queue
+
+## Event-Driven Communication
+
+The system uses an event-driven architecture where components communicate through events published on the central event bus.
+
+### Core Events
+
+| Event Name | Description | Payload |
+|------------|-------------|---------|
+| `mqtt.message` | Raw MQTT message received | `{topic, message}` |
+| `message.processed` | Message normalized and processed | Normalized message |
+| `message.error` | Error in message processing | `{error, message}` |
+| `data.stored` | Data stored in data store | `{deviceId, message}` |
+| `relay.message` | Message to be relayed | `{topic, payload}` |
+
+### Event Flow Example
+
+```javascript
+// 1. MQTT Client receives message
+eventBus.emit("mqtt.message", { topic, message });
+
+// 2. Normalizer processes message
+eventBus.on("mqtt.message", async (data) => {
+  const normalized = normalizer.normalize(data.topic, data.message);
+  if (normalized) {
+    eventBus.emit("message.processed", normalized);
+  }
+});
+
+// 3. Data Store stores message
+eventBus.on("message.processed", (message) => {
+  dataStore.handleMessage(message);
+});
+
+// 4. WebSocket broadcasts to clients
+eventBus.on("message.processed", (message) => {
+  websocket.broadcast(message);
+});
+```
+
+## Component Lifecycle
+
+All components follow a standardized lifecycle managed by the ComponentRegistry.
+
+### Lifecycle States
+
+1. **Registration**: Component factory is registered
+2. **Instantiation**: Component instance is created
+3. **Initialization**: Component's `initialize()` method is called
+4. **Active**: Component is fully operational
+5. **Shutdown**: Component's `shutdown()` method is called
+
+### Initialization Order
+
+Components are initialized in a specific order to handle dependencies:
+
+1. Core components (mqtt, normalizer, dataStore)
+2. Storage components (database, cache, writeBuffer)
+3. API components (rest, websocket, webhook)
+4. Relay components (messageRelay)
+5. Optional modules (security, monitoring, processing, resilience)
+
+### Component Implementation Example
+
+```javascript
+class MyComponent extends BaseComponent {
+  constructor(options = {}) {
+    super(options);
+    // Component-specific initialization
+  }
+
+  async initialize() {
+    // Validate required options
+    this.validateOptions(['requiredOption']);
+    
+    // Component initialization logic
+    this.logger.info("MyComponent initialized");
+  }
+
+  async shutdown() {
+    // Cleanup resources
+    this.logger.info("MyComponent shutting down");
+    super.shutdown();
+  }
+
+  // Component-specific methods
+  processMessage(message) {
+    // Process incoming messages
+  }
+}
+```
+
+## Data Flow
+
+The system processes IoT data through a well-defined pipeline:
+
+### 1. Message Ingestion
+
+```
+MQTT Broker → MQTT Client → Event Bus
+```
+
+### 2. Normalization
+
+```
+Event Bus → Normalizer → Device Parser → Normalized Message
+```
+
+### 3. Processing
+
+```
+Normalized Message → Data Validator → Data Transformer → Processed Message
+```
+
+### 4. Distribution
+
+```
+Processed Message → Data Store
+                 → Cache
+                 → Write Buffer → Database
+                 → WebSocket → Clients
+                 → Message Relay → MQTT Broker
+                 → Metrics Collector
+```
+
+### 5. Monitoring
+
+```
+All Events → Metrics Collector → Alert Manager → Notifications
+```
+
+## Configuration System
+
+The system uses a hierarchical configuration system that supports:
+
+### Configuration Sources
+
+1. **Default Configuration**: Built-in defaults in `config/modular-config.json`
+2. **Environment Variables**: Override settings using `${VAR_NAME:default}` syntax
+3. **Runtime Configuration**: Dynamic updates through API
+
+### Configuration Structure
 
 ```json
 {
   "modules": {
-    "api": {
+    "moduleName": {
       "enabled": true,
+      "description": "Module description",
       "components": {
-        "webhook": {
+        "componentName": {
           "enabled": true,
           "config": {
-            "retryLimit": 5
+            // Component-specific configuration
           }
         }
       }
     }
+  },
+  "server": {
+    "port": "${PORT:3000}",
+    "host": "0.0.0.0"
+  },
+  "logger": {
+    "level": "${LOG_LEVEL:info}"
   }
 }
 ```
 
-## Adding New Components
+### Configuration Access
 
-### 1. Create Component Class
 ```javascript
-const BaseComponent = require("../core/BaseComponent");
+// Get application configuration
+const config = application.getConfig();
 
+// Check if module is enabled
+const isEnabled = application.isModuleEnabled("moduleName");
+
+// Check if component is enabled
+const isComponentEnabled = application.isComponentEnabled("moduleName", "componentName");
+```
+
+## Extensibility Points
+
+The architecture provides several ways to extend functionality:
+
+### 1. Adding New Device Types
+
+Create a parser for the new device type:
+
+```javascript
+// modules/normalizers/myDeviceParser.js
+function parse(topic, message, meta = {}) {
+  // Parse device-specific message format
+  return normalizedMessage;
+}
+
+module.exports = { parse };
+```
+
+Register the parser:
+
+```javascript
+// In NormalizerRegistry.js
+this.registerParser("MYDEV", require("./myDeviceParser"), {
+  version: "1.0.0",
+  description: "Parser for MyDevice sensors"
+});
+```
+
+### 2. Adding New Components
+
+Create a component class:
+
+```javascript
+// modules/myModule/MyComponent.js
 class MyComponent extends BaseComponent {
   async initialize() {
-    // Initialization logic
+    // Initialize component
   }
   
   async shutdown() {
-    // Cleanup logic
+    // Cleanup resources
   }
 }
 
 module.exports = MyComponent;
 ```
 
-### 2. Register Component Factory
-```javascript
-// In ComponentRegistry.registerDefaultFactories()
-this.registerFactory("myComponent", () => require("./MyComponent"));
-```
+Register the component:
 
-### 3. Add to Configuration
-```json
-{
-  "modules": {
-    "custom": {
-      "enabled": true,
-      "components": {
-        "myComponent": {
-          "enabled": true,
-          "config": {
-            "option1": "value1"
-          }
-        }
-      }
-    }
-  }
+```javascript
+// In ComponentRegistry.js
+registerDefaultFactories() {
+  this.registerFactory("myComponent", () => require("../myModule/MyComponent"));
 }
 ```
 
-## API Endpoints
+### 3. Adding Event Handlers
 
-The REST API provides the following endpoints:
+Subscribe to events in your component:
 
-- `GET /api/health` - Health check
-- `GET /api/stats` - Application statistics
-- `GET /api/devices` - List all devices
-- `GET /api/devices/:deviceId/data` - Get device data
-- `GET /api/devices/:deviceId/history` - Get device history
-- `GET /api/config` - Get configuration (safe version)
-- `GET /api/normalizers` - Get normalizer information
+```javascript
+async initialize() {
+  super.initialize();
+  
+  // Subscribe to events
+  eventBus.on("message.processed", this.handleMessage.bind(this));
+}
 
-## Future Enhancements
+handleMessage(message) {
+  // Process the message
+}
+```
 
-### Redis Integration
-The CacheManager is designed to support multiple backends. To add Redis support:
+## Design Patterns
 
-1. Install Redis client: `npm install redis`
-2. Create Redis adapter
-3. Update configuration to specify backend type
+The architecture implements several design patterns:
 
-### Plugin System
-The current architecture provides a foundation for a plugin system where components can be loaded dynamically without code changes.
+### 1. Publisher-Subscriber Pattern
 
-## Migration from Original Architecture
+Components communicate through events without direct references.
 
-1. Configuration: Replace `config/config.json` with `config/modular-config.json`
-2. Application: Use `ModularApplication` instead of `Application`
-3. Components: All components now go through the ComponentRegistry
-4. API: API endpoints are managed by RestAPIManager
+### 2. Factory Pattern
 
-## Benefits
+Component instances are created through factories registered in the ComponentRegistry.
 
-1. **Flexibility**: Enable/disable features without code changes
-2. **Maintainability**: Clear separation of concerns
-3. **Extensibility**: Easy to add new components
-4. **Configuration**: Centralized configuration with environment variable support
-5. **Testing**: Components can be tested in isolation
+### 3. Singleton Pattern
+
+Some components like DataStore use singleton pattern for shared state.
+
+### 4. Observer Pattern
+
+Components observe events and react to state changes.
+
+### 5. Strategy Pattern
+
+Different parsers implement different strategies for message normalization.
+
+### 6. Circuit Breaker Pattern
+
+Protects the system from cascading failures.
+
+## Implementation Guidelines
+
+### 1. Component Development
+
+- Always extend `BaseComponent`
+- Implement `initialize()` and `shutdown()` methods
+- Use the provided logger for consistent logging
+- Validate required options in `initialize()`
+- Emit events for significant state changes
+
+### 2. Error Handling
+
+- Use try-catch blocks for async operations
+- Emit error events for handling by other components
+- Log errors with appropriate context
+- Implement graceful degradation when possible
+
+### 3. Configuration
+
+- Use environment variables for deployment-specific settings
+- Provide sensible defaults
+- Validate configuration on startup
+- Document all configuration options
+
+### 4. Testing
+
+- Unit test each component in isolation
+- Mock external dependencies
+- Test error conditions
+- Verify event emissions
+
+### 5. Performance
+
+- Use batching for high-volume operations
+- Implement caching where appropriate
+- Monitor resource usage
+- Optimize database queries
+
+## Module Dependencies
+
+```
+Core Module
+├── MQTT Client
+├── Normalizer
+└── Data Store
+
+Storage Module
+├── Database (depends on Core)
+├── Cache (depends on Core)
+└── Write Buffer (depends on Database, Core)
+
+API Module
+├── REST API (depends on Core, Storage)
+├── WebSocket (depends on Core)
+└── Webhook (depends on Core)
+
+Relay Module
+└── Message Relay (depends on Core, MQTT Client)
+
+Security Module
+├── Auth Manager (depends on Core)
+└── Input Validator (depends on Core)
+
+Monitoring Module
+├── Metrics Collector (depends on Core)
+└── Alert Manager (depends on Core, Metrics Collector)
+
+Processing Module
+├── Data Validator (depends on Core)
+└── Data Transformer (depends on Core, Data Validator)
+
+Resilience Module
+├── Circuit Breaker (depends on Core)
+└── Retry Manager (depends on Core)
+```
+
+## Best Practices
+
+1. **Keep Components Focused**: Each component should have a single responsibility
+2. **Use Events for Communication**: Avoid direct component-to-component calls
+3. **Handle Failures Gracefully**: Implement proper error handling and recovery
+4. **Log Appropriately**: Use consistent logging levels and formats
+5. **Test Thoroughly**: Write unit and integration tests
+6. **Document Everything**: Document configuration options, events, and APIs
+7. **Version Your Changes**: Use semantic versioning for releases
+8. **Monitor Performance**: Track key metrics and optimize bottlenecks
+
+This architecture guide provides a comprehensive understanding of the IoT Middleware v3 system. For specific implementation details, refer to the source code and inline documentation.

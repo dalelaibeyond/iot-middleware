@@ -8,7 +8,7 @@ IoT Middleware v3 provides a flexible, configuration-driven architecture for han
 
 ## Architecture
 
-The middleware is organized into four module groups:
+The middleware is organized into module groups that can be enabled/disabled independently:
 
 ### Group 1: Core (Required)
 - **MQTT Client**: Receives raw sensor messages from MQTT brokers
@@ -28,12 +28,32 @@ The middleware is organized into four module groups:
 ### Group 4: Relay (Optional)
 - **Message Relay**: Relays normalized messages to MQTT brokers
 
+### Group 5: Security (Optional)
+- **Auth Manager**: JWT-based authentication and authorization
+- **Input Validator**: Data validation and sanitization
+
+### Group 6: Monitoring (Optional)
+- **Metrics Collector**: Prometheus-compatible metrics
+- **Alert Manager**: Configurable alerting system
+
+### Group 7: Processing (Optional)
+- **Data Validator**: Schema-based data validation
+- **Data Transformer**: Message transformation pipeline
+
+### Group 8: Resilience (Optional)
+- **Circuit Breaker**: Fault tolerance for external services
+- **Retry Manager**: Intelligent retry with exponential backoff
+
 ## Features
 
 - **Modular Architecture**: Enable/disable features through configuration
 - **Device Support**: Built-in support for V5008, V6800, and G6000 devices
 - **Multiple Outputs**: Database storage, REST API, WebSocket, and message relay
 - **Fault Tolerance**: Continues operating even if optional services are unavailable
+- **Security**: Authentication, authorization, and input validation
+- **Observability**: Metrics collection, monitoring, and alerting
+- **Resilience**: Circuit breaker pattern and intelligent retry mechanisms
+- **Performance**: Optimized batching, caching, and connection pooling
 - **Environment Variables**: Full support for environment variable configuration
 - **Plugin System**: Easy to extend with new device types and components
 
@@ -96,6 +116,7 @@ Each module group can be enabled or disabled independently:
   "modules": {
     "core": {
       "enabled": true,
+      "description": "Core functionality for MQTT message processing and normalization",
       "components": {
         "mqtt": { "enabled": true },
         "normalizer": { "enabled": true },
@@ -104,13 +125,16 @@ Each module group can be enabled or disabled independently:
     },
     "storage": {
       "enabled": true,
+      "description": "Persistent storage options for sensor data",
       "components": {
         "database": { "enabled": true },
-        "cache": { "enabled": true }
+        "cache": { "enabled": true },
+        "writeBuffer": { "enabled": true }
       }
     },
     "api": {
       "enabled": true,
+      "description": "API endpoints for external access to sensor data",
       "components": {
         "rest": { "enabled": true },
         "websocket": { "enabled": true },
@@ -119,8 +143,41 @@ Each module group can be enabled or disabled independently:
     },
     "relay": {
       "enabled": true,
+      "description": "Message relay for forwarding normalized messages",
       "components": {
         "messageRelay": { "enabled": true }
+      }
+    },
+    "security": {
+      "enabled": false,
+      "description": "Security and authentication features",
+      "components": {
+        "authManager": { "enabled": false },
+        "inputValidator": { "enabled": false }
+      }
+    },
+    "monitoring": {
+      "enabled": false,
+      "description": "Monitoring and observability",
+      "components": {
+        "metricsCollector": { "enabled": false },
+        "alertManager": { "enabled": false }
+      }
+    },
+    "processing": {
+      "enabled": false,
+      "description": "Data processing pipeline",
+      "components": {
+        "dataValidator": { "enabled": false },
+        "dataTransformer": { "enabled": false }
+      }
+    },
+    "resilience": {
+      "enabled": false,
+      "description": "Error handling and recovery",
+      "components": {
+        "circuitBreaker": { "enabled": false },
+        "retryManager": { "enabled": false }
       }
     }
   }
@@ -221,9 +278,44 @@ GET /api/normalizers
 ```
 Returns information about registered device parsers.
 
+#### Database Test (Security enabled)
+```
+POST /api/test/database
+```
+Tests database connection and saves a test message (requires authentication).
+
+#### Write Buffer Status
+```
+GET /api/status/writebuffer
+```
+Returns current status of the write buffer component.
+
+#### Metrics (Monitoring enabled)
+```
+GET /api/metrics
+```
+Returns Prometheus-compatible metrics (when monitoring module is enabled).
+
+#### Alerts (Alert Manager enabled)
+```
+GET /api/alerts
+POST /api/alerts
+```
+Get or configure alert rules (when alert manager is enabled).
+
 ### WebSocket API
 
 Connect to `ws://localhost:3000` to receive real-time sensor data updates.
+
+#### Authentication (Security enabled)
+When security module is enabled, WebSocket connections require authentication:
+```javascript
+const ws = new WebSocket('ws://localhost:3000', [], {
+  headers: {
+    'Authorization': 'Bearer YOUR_JWT_TOKEN'
+  }
+});
+```
 
 ## Device Integration
 
