@@ -125,7 +125,7 @@ class DatabaseManager extends BaseComponent {
     const placeholders = messages.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").join(", ");
     
     const sql = `
-            INSERT INTO sensor_data (device_id, device_type, mod_add, mod_port, mod_id, sensor_type, timestamp, payload, meta, created_at)
+            INSERT INTO sensor_data (device_id, device_type, mod_add, mod_port, mod_id, msg_Type, timestamp, payload, meta, created_at)
             VALUES ${placeholders}
         `;
 
@@ -164,7 +164,7 @@ class DatabaseManager extends BaseComponent {
     }
 
     const sql = `
-            INSERT INTO sensor_data (device_id, device_type, mod_add, mod_port, mod_id, sensor_type, timestamp, payload, meta, created_at)
+            INSERT INTO sensor_data (device_id, device_type, mod_add, mod_port, mod_id, msg_Type, timestamp, payload, meta, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
@@ -198,7 +198,7 @@ class DatabaseManager extends BaseComponent {
     }
 
     const sql = `
-            SELECT device_id, device_type, mod_add, mod_port, mod_id, sensor_type, timestamp, payload, meta, created_at
+            SELECT device_id, device_type, mod_add, mod_port, mod_id, msg_Type, timestamp, payload, meta, created_at
             FROM sensor_data
             WHERE device_id = ?
             ORDER BY timestamp DESC
@@ -231,7 +231,7 @@ class DatabaseManager extends BaseComponent {
     }
 
     const sql = `
-            SELECT device_id, device_type, mod_add, mod_port, mod_id, sensor_type, timestamp, payload, meta, created_at
+            SELECT device_id, device_type, mod_add, mod_port, mod_id, msg_Type, timestamp, payload, meta, created_at
             FROM sensor_data
             WHERE device_id = ? AND mod_id = ?
             ORDER BY timestamp DESC
@@ -264,7 +264,7 @@ class DatabaseManager extends BaseComponent {
     }
 
     const sql = `
-            SELECT device_id, device_type, mod_add, mod_port, mod_id, sensor_type, timestamp, payload, meta, created_at
+            SELECT device_id, device_type, mod_add, mod_port, mod_id, msg_Type, timestamp, payload, meta, created_at
             FROM sensor_data
             WHERE device_type = ?
             ORDER BY timestamp DESC

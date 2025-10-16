@@ -526,7 +526,7 @@ CREATE TABLE sensor_data (
   sensor_add VARCHAR(50),
   sensor_port VARCHAR(50),
   sensor_id VARCHAR(255) NOT NULL,
-  sensor_type VARCHAR(100) NOT NULL,
+  msg_Type VARCHAR(100) NOT NULL,
   timestamp DATETIME NOT NULL,
   payload JSON,
   meta JSON,

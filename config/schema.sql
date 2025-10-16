@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS sensor_data (
     mod_add INT, -- Rack Unit sensor module Modbus address, when device type is "V5008", this value identifies a rack of sensors
     mod_port INT, -- Rack Unit sensor module connection port on the V6800 gateway. when device type is "V6800", the device use different connection ports to distinguish it's sensor groups under it.
     mod_id VARCHAR(32) NOT NULL, -- Rack Unit sensor module id
-    sensor_type VARCHAR(32) NOT NULL, -- "temperature" or "humidity" or "rfid" or "noise", determined after message parsing
+    msg_Type VARCHAR(32) NOT NULL, -- "temperature" or "humidity" or "rfid" or "noise", determined after message parsing
     timestamp DATETIME NOT NULL,
     payload JSON NOT NULL,
     meta JSON,

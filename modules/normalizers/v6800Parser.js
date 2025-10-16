@@ -40,7 +40,7 @@ function parse(topic, message, meta = {}) {
       modAdd: null, // Not applicable for V6800
       modPort: payload.port || null, // Extract port from payload
       modId: payload.sensorId || `${gatewayId}-${detectedSensorType}`, // Use payload sensorId or create default
-      sensorType: detectedSensorType,
+      msg_Type: detectedSensorType,
       ts: payload.time
         ? new Date(payload.time).toISOString()
         : new Date().toISOString(),
