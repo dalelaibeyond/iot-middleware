@@ -388,12 +388,12 @@ Raw:EF02010000898393CC020000898393CCB801BCF7
     
     ```jsx
     const MSG_TYPE_MAP = {
-      "CB": "heartbeat",
-      "CC": "heartbeat",
-      "BB": "rfid",
-      "BA": "door",
-      "EF01": "device_info",
-      "EF02": "module_info"
+      "CB": "Heartbeat",
+      "CC": "Heartbeat",
+      "BB": "Rfid",
+      "BA": "Door",
+      "EF01": "DeviceInfo",
+      "EF02": "ModuleInfo"
     };
     ```
     

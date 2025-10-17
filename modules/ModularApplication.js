@@ -62,7 +62,7 @@ class ModularApplication extends BaseComponent {
       ]);
 
       // Normalize the message
-      const normalized = normalizer.normalize(topic, message, { topic });
+      const normalized = normalizer.normalize(topic, message, {});
       
       if (!normalized) {
         logger.warn(`Message normalization failed for topic: ${topic}`);
@@ -110,10 +110,8 @@ class ModularApplication extends BaseComponent {
         components.websocket.broadcast(message);
       }
 
-      // Handle message relay if enabled
-      if (components.messageRelay && components.messageRelay.handleMessage) {
-        components.messageRelay.handleMessage(message);
-      }
+      // Message relay is handled by event subscription in messageRelay.js
+      // No need to call directly here to avoid duplicate processing
     } catch (error) {
       logger.error("Error processing message:", error);
       eventBus.emit("message.error", { error, message });
@@ -132,7 +130,7 @@ class ModularApplication extends BaseComponent {
       const mqtt = this.componentRegistry.getComponent("mqtt");
       if (mqtt) {
         await mqtt.publish(relayData.topic, relayData.payload);
-        logger.debug(`Relayed message to topic: ${relayData.topic}`);
+        // Debug log is handled by messageRelay.js to avoid duplication
       }
     } catch (error) {
       logger.error("Error publishing relay message:", error);

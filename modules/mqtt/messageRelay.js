@@ -52,12 +52,15 @@ class MessageRelay extends BaseComponent {
                   "${gatewayId}",
                   gatewayId
                 );
-                // Create a clean normalized payload with only the necessary fields
+                // Create a clean normalized payload with all fields from the normalizer
                 const normalizedPayload = {
                   deviceId: message.deviceId,
                   deviceType: message.deviceType,
-                  sensorId: message.sensorId,
+                  msgType: message.msgType,
                   sensorType: message.sensorType,
+                  modAdd: message.modAdd,
+                  modPort: message.modPort,
+                  modId: message.modId,
                   ts: message.ts,
                   payload: message.payload,
                   meta: message.meta,
@@ -143,7 +146,7 @@ class MessageRelay extends BaseComponent {
 
       eventBus.emit("relay.success", {
         sourceTopic: sourceTopic,
-        targetTopic: transformed.topic,
+        targetTopic: transformed.topic
       });
     } catch (error) {
       this.logger.error("Error relaying message:", error);

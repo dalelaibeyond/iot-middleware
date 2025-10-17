@@ -239,10 +239,8 @@ class ComponentRegistry {
       // writeBuffer is handled in ModularApplication
         
       case "messageRelay":
-        // Subscribe to processed messages
-        if (instance.handleMessage) {
-          eventBus.on("message.processed", instance.handleMessage.bind(instance));
-        }
+        // messageRelay subscribes to "message.processed" in its own initialize() method
+        // No need to subscribe again here to avoid duplicate processing
         break;
     }
   }
