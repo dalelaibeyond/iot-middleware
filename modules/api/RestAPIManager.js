@@ -196,41 +196,6 @@ class RestAPIManager extends BaseComponent {
       }
     });
 
-    // Test database connection and save a test message
-    this.router.post("/test/database", async (req, res) => {
-      try {
-        const application = req.app.get("application");
-        if (!application) {
-          return res.status(500).json({ error: "Application not available" });
-        }
-
-        const database = application.getComponent("database");
-        if (!database) {
-          return res.status(500).json({ error: "Database not available" });
-        }
-
-        const success = await database.testSaveMessage();
-        if (success) {
-          res.json({
-            status: "success",
-            message: "Test message saved to database successfully",
-            timestamp: new Date().toISOString()
-          });
-        } else {
-          res.status(500).json({
-            status: "error",
-            message: "Failed to save test message to database"
-          });
-        }
-      } catch (error) {
-        logger.error("Error testing database:", error);
-        res.status(500).json({
-          error: "Failed to test database",
-          details: error.message
-        });
-      }
-    });
-
     // Get write buffer status
     this.router.get("/status/writebuffer", (req, res) => {
       try {

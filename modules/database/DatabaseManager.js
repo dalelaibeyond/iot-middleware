@@ -296,41 +296,6 @@ class DatabaseManager extends BaseComponent {
     }
     super.shutdown();
   }
-
-  // Test method to save a single message directly
-  async testSaveMessage() {
-    if (!this.isEnabled || !this.pool) {
-      return false;
-    }
-
-    const testMessage = {
-      deviceId: "test-device-001",
-      deviceType: "V5008",
-      modAdd: null,
-      modPort: null,
-      modId: null,
-      msgType: "TempHum",
-      sensorType: "TemHum",
-      ts: new Date().toISOString(),
-      payload: {
-        rawHexString: "TEST123456",
-        temperature: 25.5
-      },
-      meta: {
-        rawTopic: "V5008Upload/test-device-001/TemHum",
-        deviceType: "V5008",
-        test: true
-      }
-    };
-
-    try {
-      await this.saveHistory(testMessage);
-      return true;
-    } catch (error) {
-      this.logger.error("Failed to save test message:", error);
-      return false;
-    }
-  }
 }
 
 module.exports = DatabaseManager;

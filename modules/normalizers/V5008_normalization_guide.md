@@ -22,18 +22,19 @@ This document describes how to parse and normalize raw hex string from the V5008
 3. Multi-byte fields use parentheses — e.g. `(4B)` = 8 hex chars.
 4. Repeated groups are indicated by `xN`.
 5. All normalized JSON share a consistent structure:
-   ```json   
+   ```json
 {
-  "deviceId":"<deviceId>",  
+  "deviceId":"<deviceId>",
   "deviceType":"V5008",
-  "msgType":"TemHum" | "Noise" | "Door" | "Rfid" | "Heartbeat" | "DeviceInfo" | "ModuleInfo",  
+  "msgType":"TemHum" | "Noise" | "Door" | "Rfid" | "Heartbeat" | "DeviceInfo" | "ModuleInfo",
+  "sensorType":"<sensorType>",
   "modAdd": <modAdd>,
   "modPort": <modPort>,
 	"modId":"<modId>",
   "ts": "2025-09-25T07:56:31Z",
   
   "payload":{...},
-  "meta":{"topic":"...", "rawHexString":"..."}  
+  "meta":{"rawTopic":"...", "rawHexString":"..."}
 }
 ```
 
@@ -68,9 +69,10 @@ valid value only modAdd from 1-5;
   "deviceId":"2437871205",
   "deviceType":"V5008",
   "msgType":"Heartbeat",
+  "sensorType":"OpeAck",
   "modAdd": null,
   "modPort": null,
-	"modId":null,  
+	"modId":null,
   "ts": "2025-09-25T07:56:31Z",
   
   "payload":[
@@ -81,10 +83,10 @@ valid value only modAdd from 1-5;
     { "modAdd": 5, "modId" : '0',          "uNum"  : 0 }
   ],
   
-  "meta":{  
-   "topic":"V5008Upload/2437871205/OpeAck",
-   "rawHexString":"CC01EC3737BF0C028C090995120300000000000400000000000500000000000600000000000700000000000800000000000900000000000A00000000003401778E"  
-  }  
+  "meta":{
+   "rawTopic":"V5008Upload/2437871205/OpeAck",
+   "rawHexString":"CC01EC3737BF0C028C090995120300000000000400000000000500000000000600000000000700000000000800000000000900000000000A00000000003401778E"
+  }
 }
 
 ```
@@ -116,9 +118,10 @@ Raw: BB028C0909950012030400DD3950641100DD23B0B41200DD27EE344C01EC3F
   "deviceId":"2437871205",
   "deviceType":"V5008",
   "msgType":"Rfid",
+  "sensorType":"LabelState",
   "modAdd": 2,
   "modPort": null,
-	"modId":"2349402517",    
+	"modId":"2349402517",
   "ts": "2025-09-25T07:56:31Z",
   
   "payload":{
@@ -127,14 +130,14 @@ Raw: BB028C0909950012030400DD3950641100DD23B0B41200DD27EE344C01EC3F
 	  "rfidData":[
       { "uPos":4, "uIfAlarm": 0,  "uRfid": "DD395064" },
       { "uPos":17, "uIfAlarm": 0, "uRfid": "DD23B0B4" },
-      { "uPos":18, "uIfAlarm": 0, "uRfid": "DD27EE34" }	  
-	  ]  
+      { "uPos":18, "uIfAlarm": 0, "uRfid": "DD27EE34" }
+	  ]
   },
   
-  "meta":{  
-   "topic":"V5008Upload/2437871205/LabelState",
-   "rawHexString":"BB028C0909950012030400DD3950641100DD23B0B41200DD27EE344C01EC3F"  
-  }  
+  "meta":{
+   "rawTopic":"V5008Upload/2437871205/LabelState",
+   "rawHexString":"BB028C0909950012030400DD3950641100DD23B0B41200DD27EE344C01EC3F"
+  }
 }
 ```
 
@@ -165,24 +168,25 @@ Raw: 028C0909950A1B2938350B1B2337530C1B0336270D000000000E000000000F0000000035019
   "deviceId":"2437871205",
   "deviceType":"V5008",
   "msgType":"TempHum",
+  "sensorType":"TemHum",
   "modAdd": 2,
   "modPort": null,
-	"modId":"2349402517",    
-  "ts": "2025-09-25T07:56:31Z",  
+	"modId":"2349402517",
+  "ts": "2025-09-25T07:56:31Z",
   
   "payload": [
     { "thAdd":10, "temp": 27.41, "hum": 56.53 },
     { "thAdd":11, "temp": 27.35, "hum": 55.83 },
-    { "thAdd":12, "temp": 27.03, "hum": 54.39 },    
+    { "thAdd":12, "temp": 27.03, "hum": 54.39 },
     { "thAdd":13, "temp": 0, "hum": 0 },
     { "thAdd":14, "temp": 0, "hum": 0 },
     { "thAdd":15, "temp": 0, "hum": 0 }
   ],
   
-  "meta":{  
-   "topic":"V5008Upload/2437871205/TemHum",
-   "rawHexString":"028C0909950A1B2938350B1B2337530C1B0336270D000000000E000000000F0000000035019E28"  
-  }    
+  "meta":{
+   "rawTopic":"V5008Upload/2437871205/TemHum",
+   "rawHexString":"028C0909950A1B2938350B1B2337530C1B0336270D000000000E000000000F0000000035019E28"
+  }
 }
 
   
@@ -215,10 +219,11 @@ Raw: 028C0909951000000000110000000012000000007001DB9E
   "deviceId":"2437871205",
   "deviceType":"V5008",
   "msgType":"Noise",
+  "sensorType":"Noise",
   "modAdd": 2,
   "modPort": null,
-	"modId":"2349402517",    
-  "ts": "2025-09-25T07:56:31Z",  	
+	"modId":"2349402517",
+  "ts": "2025-09-25T07:56:31Z",
   
   "payload": [
     { "nsAdd": 16, "nsLevel": 0 },
@@ -226,10 +231,10 @@ Raw: 028C0909951000000000110000000012000000007001DB9E
     { "nsAdd": 18, "nsLevel": 0 }
   ],
   
-  "meta":{  
-   "topic":"V5008Upload/2437871205/Noise",
-   "rawHexString":"028C0909951000000000110000000012000000007001DB9E"  
-  }      
+  "meta":{
+   "rawTopic":"V5008Upload/2437871205/Noise",
+   "rawHexString":"028C0909951000000000110000000012000000007001DB9E"
+  }
 }
 ```
 
@@ -260,20 +265,21 @@ Raw: BA01EC3737BF1194016082
 {
   "deviceId":"2437871205",
   "deviceType":"V5008",
-  "msgType":"Noise",
+  "msgType":"Door",
+  "sensorType":"OpeAck",
   "modAdd": 2,
   "modPort": null,
-	"modId":"2349402517",    
-  "ts": "2025-09-25T07:56:31Z",  	
+	"modId":"2349402517",
+  "ts": "2025-09-25T07:56:31Z",
   
   "payload": {
    "drStatus":"0x11"
   },
   
-  "meta":{  
-   "topic":"V5008Upload/2437871205/OpeAck",
-   "rawHexString":"BA01EC3737BF1194016082"  
-  }      
+  "meta":{
+   "rawTopic":"V5008Upload/2437871205/OpeAck",
+   "rawHexString":"BA01EC3737BF1194016082"
+  }
 }
 ```
 
@@ -309,10 +315,11 @@ Raw: EF011390958DD85FC0A864D3FFFF0000C0A800018082914EF665B7013C37
   "deviceId":"2437871205",
   "deviceType":"V5008",
   "msgType":"DeviceInfo",
+  "sensorType":"OpeAck",
   "modAdd": null,
   "modPort": null,
-	"modId":null,    
-  "ts": "2025-09-25T07:56:31Z",  	  
+	"modId":null,
+  "ts": "2025-09-25T07:56:31Z",
   
   "payload": {
       "firmwareVer":"2509101151",
@@ -320,12 +327,12 @@ Raw: EF011390958DD85FC0A864D3FFFF0000C0A800018082914EF665B7013C37
       "mask":"255.255.0.0",
       "gateway":"192.168.0.1",
       "mac":"80:82:91:4E:F6:65"
-   },   
+   },
    
-  "meta":{  
-    "topic":"V5008Upload/2437871205/OpeAck",
-    "rawHexString":"EF011390958DD85FC0A864D3FFFF0000C0A800018082914EF665B7013C37"  
-  }      
+  "meta":{
+    "rawTopic":"V5008Upload/2437871205/OpeAck",
+    "rawHexString":"EF011390958DD85FC0A864D3FFFF0000C0A800018082914EF665B7013C37"
+  }
 }
 ```
 
@@ -349,20 +356,21 @@ Raw:EF02010000898393CC020000898393CCB801BCF7
   "deviceId":"2437871205",
   "deviceType":"V5008",
   "msgType":"ModuleInfo",
+  "sensorType":"OpeAck",
   "modAdd": null,
   "modPort": null,
-	"modId": null
-  "ts": "2025-09-25T07:56:31Z",  	
+	"modId": null,
+  "ts": "2025-09-25T07:56:31Z",
   
   "payload": [
       { "modAdd":1, "modFirwareVer": "2307101644" },
       { "modAdd":2, "modFirwareVer": "2307101644" }
    ],
   
-  "meta":{  
-   "topic":"V5008Upload/2437871205/OpeAck",
-   "rawHexString":"EF02010000898393CC020000898393CCB801BCF7"  
-  }      
+  "meta":{
+   "rawTopic":"V5008Upload/2437871205/OpeAck",
+   "rawHexString":"EF02010000898393CC020000898393CCB801BCF7"
+  }
 }
 ```
 
@@ -388,9 +396,14 @@ Raw:EF02010000898393CC020000898393CCB801BCF7
     
     ```jsx
     const MSG_TYPE_MAP = {
+      //identify message type by topic[2]
+      "LabelState": "Rfid",
+      "TemHum": "TempHum",
+      "Noise": "Noise",
+
+      //identify message type by header
       "CB": "Heartbeat",
       "CC": "Heartbeat",
-      "BB": "Rfid",
       "BA": "Door",
       "EF01": "DeviceInfo",
       "EF02": "ModuleInfo"
@@ -419,4 +432,4 @@ const val = parseInt(hex.substr(pos, len), 16);
 
 📘 **End of Document**
 
-*Last updated: 2025-09-25*
+*Last updated: 2025-10-27*
