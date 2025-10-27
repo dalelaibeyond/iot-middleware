@@ -19,5 +19,15 @@
   },
   "devDependencies": {
     "nodemon": "^3.1.0"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dalelaibeyond/iot-middleware.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/dalelaibeyond/iot-middleware/issues"
+  },
+  "homepage": "https://github.com/dalelaibeyond/iot-middleware#readme"
 }

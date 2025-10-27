@@ -125,7 +125,7 @@ class DatabaseManager extends BaseComponent {
     const placeholders = messages.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").join(", ");
     
     const sql = `
-            INSERT INTO sensor_data (device_id, device_type, mod_add, mod_port, mod_id, msg_Type, sensor_type, timestamp, payload, meta, created_at)
+            INSERT INTO sensor_data (device_id, device_type, mod_add, mod_port, mod_id, sensor_type, msg_Type, timestamp, payload, meta, created_at)
             VALUES ${placeholders}
         `;
 
@@ -138,8 +138,8 @@ class DatabaseManager extends BaseComponent {
         msg.modAdd || null,
         msg.modPort || null,
         msg.modId || null,
-        msg.msgType || msg.sensorType || "unknown",
         msg.sensorType || null, // Map sensorType to sensor_type field
+        msg.msgType || msg.sensorType || "unknown",
         this.toMySQLDateTime(msg.ts),
         JSON.stringify(msg.payload || {}),
         JSON.stringify(msg.meta || {}),
@@ -165,7 +165,7 @@ class DatabaseManager extends BaseComponent {
     }
 
     const sql = `
-            INSERT INTO sensor_data (device_id, device_type, mod_add, mod_port, mod_id, msg_Type, sensor_type, timestamp, payload, meta, created_at)
+            INSERT INTO sensor_data (device_id, device_type, mod_add, mod_port, mod_id, sensor_type, msg_Type, timestamp, payload, meta, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
@@ -175,8 +175,8 @@ class DatabaseManager extends BaseComponent {
       message.modAdd || null,
       message.modPort || null,
       message.modId || null,
-      message.msgType || message.sensorType || "unknown",
       message.sensorType || null, // Map sensorType to sensor_type field
+      message.msgType || message.sensorType || "unknown",
       this.toMySQLDateTime(message.ts),
       JSON.stringify(message.payload || {}),
       JSON.stringify(message.meta || {}),
@@ -200,7 +200,7 @@ class DatabaseManager extends BaseComponent {
     }
 
     const sql = `
-            SELECT device_id, device_type, mod_add, mod_port, mod_id, msg_Type, sensor_type, timestamp, payload, meta, created_at
+            SELECT device_id, device_type, mod_add, mod_port, mod_id, sensor_type, msg_Type, timestamp, payload, meta, created_at
             FROM sensor_data
             WHERE device_id = ?
             ORDER BY timestamp DESC
@@ -233,7 +233,7 @@ class DatabaseManager extends BaseComponent {
     }
 
     const sql = `
-            SELECT device_id, device_type, mod_add, mod_port, mod_id, msg_Type, sensor_type, timestamp, payload, meta, created_at
+            SELECT device_id, device_type, mod_add, mod_port, mod_id, sensor_type, msg_Type, timestamp, payload, meta, created_at
             FROM sensor_data
             WHERE device_id = ? AND mod_id = ?
             ORDER BY timestamp DESC
@@ -266,7 +266,7 @@ class DatabaseManager extends BaseComponent {
     }
 
     const sql = `
-            SELECT device_id, device_type, mod_add, mod_port, mod_id, msg_Type, sensor_type, timestamp, payload, meta, created_at
+            SELECT device_id, device_type, mod_add, mod_port, mod_id, sensor_type, msg_Type, timestamp, payload, meta, created_at
             FROM sensor_data
             WHERE device_type = ?
             ORDER BY timestamp DESC

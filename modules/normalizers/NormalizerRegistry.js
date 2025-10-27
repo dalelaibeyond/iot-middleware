@@ -137,9 +137,9 @@ class NormalizerRegistry {
         // Add metadata
         normalizedMessage.meta = {
           ...normalizedMessage.meta,
-          normalizedBy: deviceType,
-          normalizedAt: new Date().toISOString(),
-          parserVersion: this.parsers.get(deviceType).version
+          //normalizedBy: deviceType,
+          //normalizedAt: new Date().toISOString(),
+          //parserVersion: this.parsers.get(deviceType).version
         };
         
         logger.debug(`Message normalized for device type: ${deviceType}`, {
