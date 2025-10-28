@@ -4,7 +4,7 @@ Below is a **developer-facing `.md` document** that clearly explains **how to no
 
 You can include this file as
 
-📄 `docs/V5008_normalization_guide.md` in your project.
+📄 `doc/V5008_normalization_guide.md` in your project.
 
 ---
 

@@ -594,4 +594,4 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 For support and questions:
 - Create an issue in the repository
-- Check the documentation in `MODULAR_ARCHITECTURE.md`
+- Check the documentation in `doc/MODULAR_ARCHITECTURE.md`
