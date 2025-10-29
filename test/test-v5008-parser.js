@@ -1,5 +1,5 @@
-const { parse } = require('./modules/normalizers/v5008Parser');
-const logger = require('./utils/logger');
+const { parse } = require('../modules/normalizers/v5008Parser');
+const logger = require('../utils/logger');
 
 // Test cases from the normalization guide
 const testCases = [

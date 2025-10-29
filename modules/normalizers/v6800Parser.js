@@ -1,4 +1,5 @@
 const logger = require("../../utils/logger");
+const { colorJson } = require("../../utils/colorJson");
 
 /**
  * Parser for V6800Upload devices
@@ -57,19 +58,31 @@ const createPortSpecificMessages = (data, baseMessage) => {
     // Single port - return single message
     const portData = data[0];
     return {
-      ...baseMessage,
+      deviceId: baseMessage.deviceId,
+      deviceType: baseMessage.deviceType,
+      msgType: baseMessage.msgType,
+      sensorType: baseMessage.sensorType,
+      modAdd: baseMessage.modAdd,
       modPort: portData.host_gateway_port_index || null,
       modId: portData.extend_module_sn || null,
-      payload: processPortData(portData, baseMessage.msgType)
+      ts: baseMessage.ts,
+      payload: processPortData(portData, baseMessage.msgType),
+      meta: baseMessage.meta
     };
   }
   
   // Multiple ports - return array of messages
   return data.map(portData => ({
-    ...baseMessage,
+    deviceId: baseMessage.deviceId,
+    deviceType: baseMessage.deviceType,
+    msgType: baseMessage.msgType,
+    sensorType: baseMessage.sensorType,
+    modAdd: baseMessage.modAdd,
     modPort: portData.host_gateway_port_index,
     modId: portData.extend_module_sn,
-    payload: processPortData(portData, baseMessage.msgType)
+    ts: baseMessage.ts,
+    payload: processPortData(portData, baseMessage.msgType),
+    meta: baseMessage.meta
   }));
 };
 
@@ -94,8 +107,8 @@ const processPortData = (portData, msgType) => {
     case "TempHum":
       return portData.th_data.map(th => ({
         add: th.temper_position,
-        temp: th.temper_swot,
-        hum: th.hygrometer_swot
+        temp: parseFloat(th.temper_swot).toFixed(2),
+        hum: parseFloat(th.hygrometer_swot).toFixed(2)
       }));
     
     case "Noise":
@@ -141,6 +154,7 @@ const parseHeartbeat = (rawMessage, topic, meta) => {
     meta: {
       rawTopic: topic,
       msgId: rawMessage.uuid_number,
+      msgType: rawMessage.msg_type,
       ...meta
     }
   };
@@ -165,6 +179,7 @@ const parseRfid = (rawMessage, topic, meta) => {
     meta: {
       rawTopic: topic,
       msgId: rawMessage.uuid_number,
+      msgType: rawMessage.msg_type,
       ...meta
     }
   };
@@ -191,6 +206,7 @@ const parseTempHum = (rawMessage, topic, meta) => {
     meta: {
       rawTopic: topic,
       msgId: rawMessage.uuid_number,
+      msgType: rawMessage.msg_type,
       ...meta
     }
   };
@@ -217,6 +233,7 @@ const parseNoise = (rawMessage, topic, meta) => {
     meta: {
       rawTopic: topic,
       msgId: rawMessage.uuid_number,
+      msgType: rawMessage.msg_type,
       ...meta
     }
   };
@@ -243,6 +260,7 @@ const parseDoor = (rawMessage, topic, meta) => {
     meta: {
       rawTopic: topic,
       msgId: rawMessage.uuid_number,
+      msgType:rawMessage.msg_type,
       ...meta
     }
   };
@@ -285,6 +303,7 @@ const parseDevModInfo = (rawMessage, topic, meta) => {
     meta: {
       rawTopic: topic,
       msgId: rawMessage.uuid_number,
+      msgType: rawMessage.msg_type,
       ...meta
     }
   };
@@ -298,47 +317,72 @@ const parseDevModInfo = (rawMessage, topic, meta) => {
  * @returns {Object|Array|null} Normalized message(s) or null on error
  */
 function parse(topic, message, meta = {}) {
+  let normalizedMessage = null;
+  
   try {
-    // Parse JSON message if it's a string
-    const rawMessage = typeof message === "string" ? JSON.parse(message) : message;
+    // Parse JSON message - handle Buffer (from MQTT), string, or object (from tests)
+    let rawMessage;
+    
+    if (Buffer.isBuffer(message)) {
+      // MQTT message comes as Buffer
+      rawMessage = JSON.parse(message.toString());
+    } else if (typeof message === "string") {
+      // String message
+      rawMessage = JSON.parse(message);
+    } else {
+      // Object message (from tests)
+      rawMessage = message;
+    }
+
     
     // Get message type from raw message
     const msgType = rawMessage.msg_type;
     const normalizedMsgType = MSG_TYPE_MAP[msgType];
     
     if (!normalizedMsgType) {
-      logger.warn(`Unknown V6800 message type: ${msgType}`);
+      logger.warn(`[v6800parser] Unknown V6800 message type: ${msgType}`);
       return null;
     }
     
     // Route to appropriate parser based on message type
     switch (normalizedMsgType) {
       case "Heartbeat":
-        return parseHeartbeat(rawMessage, topic, meta);
+        normalizedMessage = parseHeartbeat(rawMessage, topic, meta);
+        break;
       
       case "Rfid":
-        return parseRfid(rawMessage, topic, meta);
+        normalizedMessage = parseRfid(rawMessage, topic, meta);
+        break;
       
       case "TempHum":
-        return parseTempHum(rawMessage, topic, meta);
+        normalizedMessage = parseTempHum(rawMessage, topic, meta);
+        break;
       
       case "Noise":
-        return parseNoise(rawMessage, topic, meta);
+        normalizedMessage = parseNoise(rawMessage, topic, meta);
+        break;
       
       case "Door":
-        return parseDoor(rawMessage, topic, meta);
+        normalizedMessage = parseDoor(rawMessage, topic, meta);
+        break;
       
       case "DevModInfo":
-        return parseDevModInfo(rawMessage, topic, meta);
+        normalizedMessage = parseDevModInfo(rawMessage, topic, meta);
+        break;
       
       default:
-        logger.warn(`Unhandled V6800 message type: ${normalizedMsgType}`);
-        return null;
+        normalizedMessage = null;
+        logger.warn(`[v6800parser] Unhandled V6800 message type: ${normalizedMsgType}`);
     }
   } catch (error) {
-    logger.error(`V6800 parsing failed: ${error.message}`);
+    logger.error(`[v6800parser] V6800 parsing failed: ${error.message}`);
     return null;
   }
+  
+  //console.log('[v6800parser] Normalized Message:', JSON.stringify(normalizedMessage, null, 2));
+  logger.debug('[v6800parser] Normalized Message:\n', colorJson(normalizedMessage));
+  return normalizedMessage;
+  
 }
 
 module.exports = { parse };
