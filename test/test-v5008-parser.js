@@ -67,24 +67,29 @@ function runTests() {
         console.log(`✅ Parsed successfully!`);
         console.log(`   Device ID: ${result.deviceId}`);
         console.log(`   Message Type: ${result.msgType}`);
-        console.log(`   Module Address: ${result.modAdd}`);
+        console.log(`   Module Number: ${result.modNum}`);
         console.log(`   Module ID: ${result.modId}`);
         
         // Print payload based on message type
         if (testCase.expectedType === "Heartbeat") {
           console.log(`   Payload (modules count): ${result.payload.length}`);
         } else if (testCase.expectedType === "Rfid") {
-          console.log(`   Payload: uNum=${result.payload.uNum}, rfidNum=${result.payload.rfidNum}, rfidData count=${result.payload.rfidData.length}`);
+          console.log(`   Payload: uCount=${result.payload.uCount}, rfidNum=${result.payload.rfidNum}, rfidData count=${result.payload.rfidData.length}`);
         } else if (testCase.expectedType === "TempHum") {
           console.log(`   Payload (temp/hum sets): ${result.payload.length}`);
         } else if (testCase.expectedType === "Noise") {
           console.log(`   Payload (noise sets): ${result.payload.length}`);
         } else if (testCase.expectedType === "Door") {
-          console.log(`   Payload: drStatus=${result.payload.drStatus}`);
+          console.log(`   Payload: status=${result.payload.status}`);
         } else if (testCase.expectedType === "DeviceInfo") {
-          console.log(`   Payload: firmwareVer=${result.payload.firmwareVer}, ip=${result.payload.ip}, mac=${result.payload.mac}`);
+          console.log(`   Payload: fmVersion=${result.payload.fmVersion}, ip=${result.payload.ip}, mac=${result.payload.mac}`);
         } else if (testCase.expectedType === "ModuleInfo") {
           console.log(`   Payload (modules count): ${result.payload.length}`);
+        }
+        
+        // Check for msgId in meta
+        if (result.meta && result.meta.msgId !== undefined) {
+          console.log(`   Message ID (msgId): ${result.meta.msgId}`);
         }
         
         // Verify the message type matches expected

@@ -453,22 +453,65 @@ Buffer containing hex data: BB028C0909950012010200DD2874847E00312F</pre>
 {
   "deviceId": "2437871205",    // gateway ID from topic
   "deviceType": "V5008",        // device type from topic
-  "sensorId": "2437871205-LabelState", // combined ID
+  "msgType": "Rfid",           // normalized message type
   "sensorType": "LabelState",   // sensor type from topic
+  "modNum": 2,                 // module number
+  "modId": "2349402517",       // module ID
   "ts": "2025-10-11T09:26:49.234Z", // ISO8601 UTC timestamp
-  "payload": {                 // device-specific data
-     "rawHexString": "BB028C0909950012010200DD2874847E00312F"
+  "payload": {                 // device-specific data with updated key names
+     "uCount": 18,             // updated from uNum
+     "rfidNum": 3,
+     "rfidData": [
+       { "num": 4, "alarm": 0, "rfid": "DD287484" },  // updated from uPos, uIfAlarm, uRfid
+       { "num": 17, "alarm": 0, "rfid": "7E00312F" }
+     ]
   },
   "meta": {                    // metadata
      "rawTopic": "V5008Upload/2437871205/LabelState",
      "rawHexString": "BB028C0909950012010200DD2874847E00312F",
-     "deviceType": "V5008",
-     "topic": "V5008Upload/2437871205/LabelState",
-     "normalizedBy": "V5008",
-     "normalizedAt": "2025-10-11T09:26:49.235Z",
-     "parserVersion": "1.0.0"
+     "msgId": 784063           // message code as integer (4 bytes)
   }
 }</pre>
+
+        <h3>Key Name Updates</h3>
+        <p>Recent updates to V5008 parser key names for consistency:</p>
+        <table class="config-table">
+            <tr>
+                <th>Message Type</th>
+                <th>Old Key</th>
+                <th>New Key</th>
+            </tr>
+            <tr>
+                <td>Heartbeat</td>
+                <td>modAdd, uNum</td>
+                <td>num, uCount</td>
+            </tr>
+            <tr>
+                <td>RFID Tag Update</td>
+                <td>uNum, uPos, uIfAlarm, uRfid</td>
+                <td>uCount, num, alarm, rfid</td>
+            </tr>
+            <tr>
+                <td>Temperature & Humidity</td>
+                <td>thAdd</td>
+                <td>add</td>
+            </tr>
+            <tr>
+                <td>Noise Level</td>
+                <td>nsAdd, nsLevel</td>
+                <td>add, noise</td>
+            </tr>
+            <tr>
+                <td>Door Status</td>
+                <td>drStatus</td>
+                <td>status</td>
+            </tr>
+            <tr>
+                <td>Device & Module Info</td>
+                <td>firmwareVer, modAdd, modFirwareVer</td>
+                <td>fmVersion, add, fmVersion</td>
+            </tr>
+        </table>
     </div>
 
     <script>

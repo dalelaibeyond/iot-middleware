@@ -263,6 +263,35 @@ The system uses an event-driven architecture where components communicate throug
 | `data.stored` | Data stored in data store | `{deviceId, message}` |
 | `relay.message` | Message to be relayed | `{topic, payload}` |
 
+### Normalized Message Structure
+
+All normalized messages follow this consistent structure:
+
+```json
+{
+  "deviceId": "<device_id>",
+  "deviceType": "V5008" | "V6800" | "G6000",
+  "sensorType": "<sensor_type>",
+  "msgType": "<message_type>",
+  "modNum": <module_number>,
+  "modId": "<module_id>",
+  "ts": "<timestamp>",
+  "payload": { ... },
+  "meta": { ... }
+}
+```
+
+**Field Descriptions:**
+- `deviceId`: Unique identifier for the device
+- `deviceType`: Device model (V5008, V6800, G6000)
+- `sensorType`: Type of sensor (from MQTT topic)
+- `msgType`: Normalized message type
+- `modNum`: Module identifier (1-5 for V5008, 1-24 for V6800, null for G6000)
+- `modId`: Module serial number
+- `ts`: Message timestamp
+- `payload`: Message-specific data
+- `meta`: Metadata and original message info
+
 ### Event Flow Example
 
 ```javascript

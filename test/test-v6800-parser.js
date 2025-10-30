@@ -147,7 +147,7 @@ function testMessageType(testName, testData) {
     console.log(`Debug - Result:`, JSON.stringify(result, null, 2));
     
     // Validate basic structure
-    const requiredFields = ['deviceId', 'deviceType', 'msgType', 'sensorType', 'modAdd', 'modId', 'ts', 'payload', 'meta'];
+    const requiredFields = ['deviceId', 'deviceType', 'msgType', 'sensorType', 'modNum', 'modId', 'ts', 'payload', 'meta'];
     const missingFields = requiredFields.filter(field => !(field in result));
     
     if (missingFields.length > 0) {
@@ -171,7 +171,7 @@ function testMessageType(testName, testData) {
     console.log(`Device ID: ${result.deviceId}`);
     console.log(`Message Type: ${result.msgType}`);
     console.log(`Sensor Type: ${result.sensorType}`);
-    console.log(`Module Port: ${result.modPort}`);
+    console.log(`Module Number: ${result.modNum}`);
     console.log(`Module ID: ${result.modId}`);
     console.log(`Message ID: ${result.meta.msgId}`);
     console.log(`Payload:`, JSON.stringify(result.payload, null, 2));
@@ -227,7 +227,7 @@ function testMultiplePorts() {
       console.log(`Number of messages: ${result.length}`);
       result.forEach((msg, index) => {
         console.log(`\nMessage ${index + 1}:`);
-        console.log(`  Module Port: ${msg.modPort}`);
+        console.log(`  Module Number: ${msg.modNum}`);
         console.log(`  Module ID: ${msg.modId}`);
         console.log(`  Payload:`, JSON.stringify(msg.payload, null, 2));
       });

@@ -23,20 +23,19 @@ This document describes how to parse and normalize raw hex string from the V5008
 4. Repeated groups are indicated by `xN`.
 5. All normalized JSON share a consistent structure:
    ```json
-{
-  "deviceId":"<deviceId>",
-  "deviceType":"V5008",
-  "msgType":"TemHum" | "Noise" | "Door" | "Rfid" | "Heartbeat" | "DeviceInfo" | "ModuleInfo",
-  "sensorType":"<sensorType>",
-  "modAdd": <modAdd>,
-  "modPort": <modPort>,
-	"modId":"<modId>",
-  "ts": "2025-09-25T07:56:31Z",
-  
-  "payload":{...},
-  "meta":{"rawTopic":"...", "rawHexString":"..."}
-}
-```
+   {
+     "deviceId":"<deviceId>",
+     "deviceType":"V5008",
+     "msgType":"TemHum" | "Noise" | "Door" | "Rfid" | "Heartbeat" | "DeviceInfo" | "ModuleInfo",
+     "sensorType":"<sensorType>",
+     "modNum": <modNum>,
+    "modId":"<modId>",
+     "ts": "2025-09-25T07:56:31Z",
+     
+     "payload":{...},
+     "meta":{"rawTopic":"...", "rawHexString":"...", "msgId": <message_code_as_integer>}
+   }
+   ```
 
 ---
 
@@ -70,22 +69,22 @@ valid value only modAdd from 1-5;
   "deviceType":"V5008",
   "msgType":"Heartbeat",
   "sensorType":"OpeAck",
-  "modAdd": null,
-  "modPort": null,
-	"modId":null,
+  "modNum": null,
+ "modId":null,
   "ts": "2025-09-25T07:56:31Z",
   
   "payload":[
-    { "modAdd": 1, "modId" : '3963041727', "uNum"  : 12 },
-    { "modAdd": 2, "modId" : '2349402517', "uNum"  : 18 },
-    { "modAdd": 3, "modId" : '0',          "uNum"  : 0 },
-    { "modAdd": 4, "modId" : '0',          "uNum"  : 0 },
-    { "modAdd": 5, "modId" : '0',          "uNum"  : 0 }
+    { "num": 1, "modId" : '3963041727', "uCount"  : 12 },
+    { "num": 2, "modId" : '2349402517', "uCount"  : 18 },
+    { "num": 3, "modId" : '0',          "uCount"  : 0 },
+    { "num": 4, "modId" : '0',          "uCount"  : 0 },
+    { "num": 5, "modId" : '0',          "uCount"  : 0 }
   ],
   
   "meta":{
    "rawTopic":"V5008Upload/2437871205/OpeAck",
-   "rawHexString":"CC01EC3737BF0C028C090995120300000000000400000000000500000000000600000000000700000000000800000000000900000000000A00000000003401778E"
+   "rawHexString":"CC01EC3737BF0C028C090995120300000000000400000000000500000000000600000000000700000000000800000000000900000000000A00000000003401778E",
+   "msgId": 875822
   }
 }
 
@@ -104,7 +103,7 @@ V5008Upload/{device_id}/LabelState
 **Raw Format:**
 
 ```
-[BB][modAdd][modId(4B)][Reserved][uNum][rifdNum] ( [uPos + uIfAlarm + uRFID(4B)] x rfidNum ) [msgCode(4B)]
+[BB][modNum][modId(4B)][Reserved][uCount][rfidCount] ( [num + alarm + rfid(4B)] x rfidCount ) [msgCode(4B)]
 
 Example:
 Topic: V5008Upload/2437871205/LabelState
@@ -119,24 +118,24 @@ Raw: BB028C0909950012030400DD3950641100DD23B0B41200DD27EE344C01EC3F
   "deviceType":"V5008",
   "msgType":"Rfid",
   "sensorType":"LabelState",
-  "modAdd": 2,
-  "modPort": null,
-	"modId":"2349402517",
+  "modNum": 2,
+ "modId":"2349402517",
   "ts": "2025-09-25T07:56:31Z",
   
   "payload":{
-	  "uNum":18,
-	  "rfidNum":3,
+	  "uCount":18,
+	  "rfidCount":3,
 	  "rfidData":[
-      { "uPos":4, "uIfAlarm": 0,  "uRfid": "DD395064" },
-      { "uPos":17, "uIfAlarm": 0, "uRfid": "DD23B0B4" },
-      { "uPos":18, "uIfAlarm": 0, "uRfid": "DD27EE34" }
+      { "num":4, "alarm": 0,  "rfid": "DD395064" },
+      { "num":17, "alarm": 0,  "rfid": "DD23B0B4" },
+      { "num":18, "alarm": 0,  "rfid": "DD27EE34" }
 	  ]
   },
   
   "meta":{
    "rawTopic":"V5008Upload/2437871205/LabelState",
-   "rawHexString":"BB028C0909950012030400DD3950641100DD23B0B41200DD27EE344C01EC3F"
+   "rawHexString":"BB028C0909950012030400DD3950641100DD23B0B41200DD27EE344C01EC3F",
+   "msgId": 784063
   }
 }
 ```
@@ -169,23 +168,23 @@ Raw: 028C0909950A1B2938350B1B2337530C1B0336270D000000000E000000000F0000000035019
   "deviceType":"V5008",
   "msgType":"TempHum",
   "sensorType":"TemHum",
-  "modAdd": 2,
-  "modPort": null,
-	"modId":"2349402517",
+  "modNum": 2,
+ "modId":"2349402517",
   "ts": "2025-09-25T07:56:31Z",
   
   "payload": [
-    { "thAdd":10, "temp": 27.41, "hum": 56.53 },
-    { "thAdd":11, "temp": 27.35, "hum": 55.83 },
-    { "thAdd":12, "temp": 27.03, "hum": 54.39 },
-    { "thAdd":13, "temp": 0, "hum": 0 },
-    { "thAdd":14, "temp": 0, "hum": 0 },
-    { "thAdd":15, "temp": 0, "hum": 0 }
+    { "add":10, "temp": 27.41, "hum": 56.53 },
+    { "add":11, "temp": 27.35, "hum": 55.83 },
+    { "add":12, "temp": 27.03, "hum": 54.39 },
+    { "add":13, "temp": 0, "hum": 0 },
+    { "add":14, "temp": 0, "hum": 0 },
+    { "add":15, "temp": 0, "hum": 0 }
   ],
   
   "meta":{
    "rawTopic":"V5008Upload/2437871205/TemHum",
-   "rawHexString":"028C0909950A1B2938350B1B2337530C1B0336270D000000000E000000000F0000000035019E28"
+   "rawHexString":"028C0909950A1B2938350B1B2337530C1B0336270D000000000E000000000F0000000035019E28",
+   "msgId": 876840
   }
 }
 
@@ -220,20 +219,20 @@ Raw: 028C0909951000000000110000000012000000007001DB9E
   "deviceType":"V5008",
   "msgType":"Noise",
   "sensorType":"Noise",
-  "modAdd": 2,
-  "modPort": null,
-	"modId":"2349402517",
+  "modNum": 2,
+ "modId":"2349402517",
   "ts": "2025-09-25T07:56:31Z",
   
   "payload": [
-    { "nsAdd": 16, "nsLevel": 0 },
-    { "nsAdd": 17, "nsLevel": 0 },
-    { "nsAdd": 18, "nsLevel": 0 }
+    { "add": 16, "noise": 0 },
+    { "add": 17, "noise": 0 },
+    { "add": 18, "noise": 0 }
   ],
   
   "meta":{
    "rawTopic":"V5008Upload/2437871205/Noise",
-   "rawHexString":"028C0909951000000000110000000012000000007001DB9E"
+   "rawHexString":"028C0909951000000000110000000012000000007001DB9E",
+   "msgId": 456414
   }
 }
 ```
@@ -267,18 +266,18 @@ Raw: BA01EC3737BF1194016082
   "deviceType":"V5008",
   "msgType":"Door",
   "sensorType":"OpeAck",
-  "modAdd": 2,
-  "modPort": null,
-	"modId":"2349402517",
+  "modNum": 2,
+ "modId":"2349402517",
   "ts": "2025-09-25T07:56:31Z",
   
   "payload": {
-   "drStatus":"0x11"
+   "status":"0x11"
   },
   
   "meta":{
    "rawTopic":"V5008Upload/2437871205/OpeAck",
-   "rawHexString":"BA01EC3737BF1194016082"
+   "rawHexString":"BA01EC3737BF1194016082",
+   "msgId": 144130
   }
 }
 ```
@@ -316,13 +315,12 @@ Raw: EF011390958DD85FC0A864D3FFFF0000C0A800018082914EF665B7013C37
   "deviceType":"V5008",
   "msgType":"DeviceInfo",
   "sensorType":"OpeAck",
-  "modAdd": null,
-  "modPort": null,
-	"modId":null,
+  "modNum": null,
+ "modId":null,
   "ts": "2025-09-25T07:56:31Z",
   
   "payload": {
-      "firmwareVer":"2509101151",
+      "fmVersion":"2509101151",
       "ip":"192.168.100.211",
       "mask":"255.255.0.0",
       "gateway":"192.168.0.1",
@@ -331,7 +329,8 @@ Raw: EF011390958DD85FC0A864D3FFFF0000C0A800018082914EF665B7013C37
    
   "meta":{
     "rawTopic":"V5008Upload/2437871205/OpeAck",
-    "rawHexString":"EF011390958DD85FC0A864D3FFFF0000C0A800018082914EF665B7013C37"
+    "rawHexString":"EF011390958DD85FC0A864D3FFFF0000C0A800018082914EF665B7013C37",
+    "msgId": 202815
   }
 }
 ```
@@ -363,13 +362,14 @@ Raw:EF02010000898393CC020000898393CCB801BCF7
   "ts": "2025-09-25T07:56:31Z",
   
   "payload": [
-      { "modAdd":1, "modFirwareVer": "2307101644" },
-      { "modAdd":2, "modFirwareVer": "2307101644" }
+      { "add":1, "fmVersion": "2307101644" },
+      { "add":2, "fmVersion": "2307101644" }
    ],
   
   "meta":{
    "rawTopic":"V5008Upload/2437871205/OpeAck",
-   "rawHexString":"EF02010000898393CC020000898393CCB801BCF7"
+   "rawHexString":"EF02010000898393CC020000898393CCB801BCF7",
+   "msgId": 191511
   }
 }
 ```

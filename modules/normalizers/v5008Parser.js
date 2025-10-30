@@ -1,477 +1,524 @@
 const logger = require("../../utils/logger");
 const { colorJson } = require("../../utils/colorJson");
 
-// Message type mapping based on headers
-const MSG_TYPE_MAP = {
-
-  //identify message type by topic[2]
-  "LabelState": "Rfid",
-  "TemHum": "TempHum",
-  "Noise": "Noise",
-
-  //identify message type by header
-  "CB": "Heartbeat",
-  "CC": "Heartbeat",
-  "BA": "Door",
-  "EF01": "DeviceInfo",
-  "EF02": "ModuleInfo"
+/**
+ * Configuration constants for V5008 parser
+ */
+const CONFIG = {
+  DEVICE_TYPE: "V5008",
+  DEVICE_TYPE_LENGTH: 5,
+  
+  // Message type mapping based on topic segments
+  TOPIC_MSG_TYPE_MAP: {
+    "LabelState": "Rfid",
+    "TemHum": "TempHum",
+    "Noise": "Noise"
+  },
+  
+  // Message type mapping based on headers
+  HEADER_MSG_TYPE_MAP: {
+    "CB": "Heartbeat",
+    "CC": "Heartbeat",
+    "BA": "Door",
+    "EF01": "DeviceInfo",
+    "EF02": "ModuleInfo"
+  },
+  
+  // Message format specifications
+  MESSAGE_FORMATS: {
+    Heartbeat: {
+      header: ["CB", "CC"],
+      maxModules: 10,
+      moduleSize: 12,
+      validModRange: { min: 1, max: 5 }
+    },
+    Rfid: {
+      header: "BB",
+      rfidEntrySize: 12
+    },
+    TempHum: {
+      maxSensors: 6,
+      sensorSize: 10
+    },
+    Noise: {
+      maxSensors: 3,
+      sensorSize: 14
+    },
+    Door: {
+      header: "BA"
+    },
+    DeviceInfo: {
+      header: "EF01"
+    },
+    ModuleInfo: {
+      header: "EF02",
+      moduleSize: 14
+    }
+  }
 };
 
 /**
- * Parser for V5008Upload devices
- * Handles hex string messages from V5008 devices
+ * Utility functions for hex parsing and data transformation
  */
-function parse(topic, message, meta = {}) {
-  try {
-    // Extract device type and gateway ID from topic
+const HexUtils = {
+  /**
+   * Read a hex substring from a string
+   * @param {string} str - The source string
+   * @param {number} start - Starting position
+   * @param {number} len - Length to read
+   * @returns {string} Hex substring
+   */
+  readHex(str, start, len) {
+    return str.slice(start, start + len);
+  },
+
+  /**
+   * Read a hex substring and convert to number
+   * @param {string} str - The source string
+   * @param {number} start - Starting position
+   * @param {number} len - Length to read
+   * @returns {number} Numeric value
+   */
+  readNum(str, start, len) {
+    return parseInt(str.slice(start, start + len), 16);
+  },
+
+  /**
+   * Parse IP address from hex string
+   * @param {string} hexString - The hex string containing IP
+   * @param {number} offset - Starting offset
+   * @returns {string} IP address in dotted decimal format
+   */
+  parseIpAddress(hexString, offset) {
+    const parts = [];
+    for (let i = 0; i < 4; i++) {
+      parts.push(this.readNum(hexString, offset + i * 2, 2));
+    }
+    return parts.join(".");
+  },
+
+  /**
+   * Parse MAC address from hex string
+   * @param {string} hexString - The hex string containing MAC
+   * @param {number} offset - Starting offset
+   * @returns {string} MAC address in colon-separated format
+   */
+  parseMacAddress(hexString, offset) {
+    const parts = [];
+    for (let i = 0; i < 6; i++) {
+      parts.push(this.readHex(hexString, offset + i * 2, 2));
+    }
+    return parts.join(":");
+  },
+
+  /**
+   * Parse decimal value with 2 decimal places from hex
+   * @param {string} hexString - The hex string
+   * @param {number} offset - Starting offset
+   * @returns {number} Decimal value with 2 places
+   */
+  parseDecimalWithTwoPlaces(hexString, offset) {
+    const intPart = this.readNum(hexString, offset, 2);
+    const fracPart = this.readNum(hexString, offset + 2, 2);
+    return parseFloat(`${intPart}.${fracPart.toString().padStart(2, '0')}`);
+  },
+
+  /**
+   * Format hex value with 0x prefix
+   * @param {string} hexString - The hex string
+   * @param {number} offset - Starting offset
+   * @param {number} length - Length of hex value
+   * @returns {string} Formatted hex string
+   */
+  formatHexWithPrefix(hexString, offset, length) {
+    return "0x" + this.readHex(hexString, offset, length);
+  }
+};
+
+/**
+ * Message parsing utilities
+ */
+const MessageUtils = {
+  /**
+   * Extract device information from topic
+   * @param {string} topic - MQTT topic
+   * @returns {Object} Device information
+   */
+  extractDeviceInfo(topic) {
     const topicParts = topic.split("/");
-    const deviceType = topicParts[0].slice(0, 5); // V5008
-    const deviceId = topicParts[1] || "unknown";
-    const sensorType = topicParts[2] || "unknown";
-
-    // Debug: Log buffer information
-    logger.debug(`[V5008 PARSER] Buffer length: ${message.length}`);
-    logger.debug(`[V5008 PARSER] Buffer content (hex): ${message.toString("hex")}`);
-
-    // V5008 messages are always buffers, convert directly to hex string
-    const rawHexString = message.toString("hex").toUpperCase();
-    const header = rawHexString.substring(0, 2);
-    const subHeader = rawHexString.substring(2, 4);
-
-    
-    // Determine message type based on topic and header
-    let msgType = "Unknown";
-    if (sensorType === "TemHum") {
-      msgType = "TempHum";
-    } else if (sensorType === "Noise") {
-      msgType = "Noise";
-    } else if (sensorType === "LabelState") {
-      msgType = "Rfid";
-    } else if (sensorType === "OpeAck") {
-
-      if (header === "CB" || header === "CC") {
-        msgType = "Heartbeat";
-        //const subHeader = rawHexString.substring(2, 4);
-        //msgType = MSG_TYPE_MAP[header + subHeader] || "Unknown";
-      } else if(header === "BA") {
-        msgType = "Door";
-      } else if (header === "EF" && subHeader === "01") {
-        msgType = "DeviceInfo";
-      } else if (header === "EF" && subHeader === "02") {
-        msgType = "ModuleInfo";
-      }
-
-    }
-
-     logger.debug(`[V5008 PARSER] Message Type: ${msgType}`);
-
-    // Parse the hex string according to the V5008 message format
-    const parsedMessage = parseV5008Message(rawHexString, msgType);
-    
-    if (!parsedMessage) {
-      logger.error(`[V5008 PARSER] Failed to parse message: ${rawHexString}`);
-      return null;
-    }
-
-    // Create normalized message
-    const parsedData = {
-      deviceId: deviceId,
-      deviceType: "V5008",
-      msgType: parsedMessage.msgType || msgType,
-      sensorType: sensorType, // Use topic[2] as sensorType for consistency
-      modAdd: parsedMessage.modAdd,
-      modPort: parsedMessage.modPort,
-      modId: parsedMessage.modId,
-      ts: new Date().toISOString(),
-      payload: parsedMessage.payload,
-      meta: {
-        rawTopic: topic, // Original topic for message relay compatibility
-        rawHexString: rawHexString,
-        ...meta,
-      },
+    return {
+      deviceType: topicParts[0].slice(0, CONFIG.DEVICE_TYPE_LENGTH),
+      deviceId: topicParts[1] || "unknown",
+      sensorType: topicParts[2] || "unknown"
     };
+  },
 
-    //logger.debug(`V5008 message parsed for device: ${deviceId}, type: ${parsedMessage.msgType}`);
-    //logger.debug(colorJson(parsedData));
-    logger.debug('[v5008parser] Normalized Message:\n', colorJson(parsedData));
-
-    return parsedData;
-  } catch (error) {
-    logger.error(`V5008 parsing failed: ${error.message}`);
-    return null;
-  }
-}
-
-/**
- * Parse V5008 hex message according to the documented format
- * @param {string} hexString - The hex string to parse
- * @param {string} msgType - The message type determined from topic
- * @returns {Object|null} - Parsed message object or null if parsing failed
- */
-function parseV5008Message(hexString, msgType) {
-  try {
-    // Basic validation - minimum message length
-    if (hexString.length < 2) {
-      logger.error(`[V5008 PARSER] Message too short: ${hexString}`);
-      return null;
+  /**
+   * Determine message type from topic and headers
+   * @param {string} sensorType - Sensor type from topic
+   * @param {string} header - Message header
+   * @param {string} subHeader - Message sub-header
+   * @returns {string} Message type
+   */
+  determineMessageType(sensorType, header, subHeader) {
+    // First check topic-based message types
+    if (CONFIG.TOPIC_MSG_TYPE_MAP[sensorType]) {
+      return CONFIG.TOPIC_MSG_TYPE_MAP[sensorType];
     }
-
-    // Parse based on message type
-    switch (msgType) {
-      case "Heartbeat":
-        return parseHeartbeatMessage(hexString);
-      case "Rfid":
-        return parseRfidMessage(hexString);
-      case "TempHum":
-        return parseTempHumMessage(hexString);
-      case "Noise":
-        return parseNoiseMessage(hexString);
-      case "Door":
-        return parseDoorMessage(hexString);
-      case "DeviceInfo":
-        return parseDeviceInfoMessage(hexString);
-      case "ModuleInfo":
-        return parseModuleInfoMessage(hexString);
-      default:
-        logger.error(`[V5008 PARSER] Unknown message type: ${msgType}`);
-        return null;
-    }
-  } catch (error) {
-    logger.error(`[V5008 PARSER] Error parsing message: ${error.message}`);
-    return null;
-  }
-}
-
-/**
- * Parse Heartbeat message (CB or CC header)
- * @param {string} hexString - The hex string to parse
- * @returns {Object|null} - Parsed Heartbeat message object
- */
-function parseHeartbeatMessage(hexString) {
-  try {
-    const header = hexString.substring(0, 2);
     
-    // Format: [CB or CC] ( [modAdd + modId(4B) + uNum] x 10 ) [msgCode(4B)]
+    // Then check header-based message types
+    if (CONFIG.HEADER_MSG_TYPE_MAP[header]) {
+      return CONFIG.HEADER_MSG_TYPE_MAP[header];
+    }
+    
+    // Check combined header for EF messages
+    if (header === "EF") {
+      const combinedHeader = header + subHeader;
+      return CONFIG.HEADER_MSG_TYPE_MAP[combinedHeader] || "Unknown";
+    }
+    
+    return "Unknown";
+  },
+
+  /**
+   * Parse module ID from hex
+   * @param {string} hexString - The hex string
+   * @param {number} offset - Starting offset
+   * @returns {string} Module ID as decimal string
+   */
+  parseModuleId(hexString, offset) {
+    const modIdHex = HexUtils.readHex(hexString, offset, 8);
+    return parseInt(modIdHex, 16).toString();
+  }
+};
+
+/**
+ * Payload processors for different message types
+ */
+const PayloadProcessors = {
+  /**
+   * Process heartbeat payload
+   * @param {string} hexString - The hex string to parse
+   * @returns {Object} Processed payload
+   */
+  Heartbeat(hexString) {
+    const format = CONFIG.MESSAGE_FORMATS.Heartbeat;
     let modules = [];
-    let offset = 2;
+    let offset = 2; // Skip header
     
-    // Parse up to 10 modules
-    for (let i = 0; i < 10; i++) {
-      if (offset + 7 > hexString.length - 4) break; // Leave room for msgCode
+    // Parse up to maxModules
+    for (let i = 0; i < format.maxModules; i++) {
+      if (offset + format.moduleSize > hexString.length - 4) break; // Leave room for msgCode
       
-      const modAdd = readNum(hexString, offset, 2);
-      const modIdHex = readHex(hexString, offset + 2, 8);
-      const modId = parseInt(modIdHex, 16).toString();
-      const uNum = readNum(hexString, offset + 10, 2);
+      const modAdd = HexUtils.readNum(hexString, offset, 2);
+      const modId = MessageUtils.parseModuleId(hexString, offset + 2);
+      const uCount = HexUtils.readNum(hexString, offset + 10, 2);
       
-      // Only include valid module addresses (1-5)
-      if (modAdd >= 1 && modAdd <= 5) {
+      // Only include valid module addresses
+      if (modAdd >= format.validModRange.min && modAdd <= format.validModRange.max) {
         modules.push({
-          modAdd: modAdd,
+          num: modAdd,
           modId: modId,
-          uNum: uNum
+          uCount: uCount
         });
       }
       
-      offset += 12;
+      offset += format.moduleSize;
     }
     
     return {
-      msgType: "Heartbeat",
-      modAdd: null,
-      modPort: null,
+      modNum: null,
       modId: null,
       payload: modules
     };
-  } catch (error) {
-    logger.error(`[V5008 PARSER] Error parsing Heartbeat message: ${error.message}`);
-    return null;
-  }
-}
+  },
 
-/**
- * Parse RFID Tag Update message (BB header)
- * @param {string} hexString - The hex string to parse
- * @returns {Object|null} - Parsed RFID message object
- */
-function parseRfidMessage(hexString) {
-  try {
-    // Format: [BB][modAdd][modId(4B)][Reserved][uNum][rifdNum] ( [uPos + uIfAlarm + uRFID(4B)] x rfidNum ) [msgCode(4B)]
-    const modAdd = readNum(hexString, 2, 2);
-    const modIdHex = readHex(hexString, 4, 8);
-    const modId = parseInt(modIdHex, 16).toString();
-    const reserved = readHex(hexString, 12, 2);
-    const uNum = readNum(hexString, 14, 2);
-    const rfidNum = readNum(hexString, 16, 2);
+  /**
+   * Process RFID payload
+   * @param {string} hexString - The hex string to parse
+   * @returns {Object} Processed payload
+   */
+  Rfid(hexString) {
+    const modAdd = HexUtils.readNum(hexString, 2, 2);
+    const modId = MessageUtils.parseModuleId(hexString, 4);
+    const reserved = HexUtils.readHex(hexString, 12, 2);
+    const uCount = HexUtils.readNum(hexString, 14, 2);
+    const rfidCount = HexUtils.readNum(hexString, 16, 2);
     
     let rfidData = [];
     let offset = 18;
     
     // Parse RFID data
-    for (let i = 0; i < rfidNum; i++) {
-      if (offset + 10 > hexString.length - 4) break; // Leave room for msgCode
+    for (let i = 0; i < rfidCount; i++) {
+      if (offset + CONFIG.MESSAGE_FORMATS.Rfid.rfidEntrySize > hexString.length - 4) break;
       
-      const uPos = readNum(hexString, offset, 2);
-      const uIfAlarm = readNum(hexString, offset + 2, 2);
-      const uRfid = readHex(hexString, offset + 4, 8);
+      const uPos = HexUtils.readNum(hexString, offset, 2);
+      const uIfAlarm = HexUtils.readNum(hexString, offset + 2, 2);
+      const uRfid = HexUtils.readHex(hexString, offset + 4, 8);
       
       rfidData.push({
-        uPos: uPos,
-        uIfAlarm: uIfAlarm,
-        uRfid: uRfid
+        num: uPos,
+        alarm: uIfAlarm,
+        rfid: uRfid
       });
       
-      offset += 12;
+      offset += CONFIG.MESSAGE_FORMATS.Rfid.rfidEntrySize;
     }
     
     return {
-      msgType: "Rfid",
-      modAdd: modAdd,
-      modPort: null,
+      modNum: modAdd,
       modId: modId,
       payload: {
-        uNum: uNum,
-        rfidNum: rfidNum,
+        uCount: uCount,
+        rfidCount: rfidCount,
         rfidData: rfidData
       }
     };
-  } catch (error) {
-    logger.error(`[V5008 PARSER] Error parsing RFID message: ${error.message}`);
-    return null;
-  }
-}
+  },
 
-/**
- * Parse Temperature & Humidity message
- * @param {string} hexString - The hex string to parse
- * @returns {Object|null} - Parsed TempHum message object
- */
-function parseTempHumMessage(hexString) {
-  try {
-    // Format: [modAdd][modId(4B)] ([thAdd + temp(4B) + hum(4B)] x 6) [msgCode(4B)]
-    const modAdd = readNum(hexString, 0, 2);
-    const modIdHex = readHex(hexString, 2, 8);
-    const modId = parseInt(modIdHex, 16).toString();
+  /**
+   * Process temperature & humidity payload
+   * @param {string} hexString - The hex string to parse
+   * @returns {Object} Processed payload
+   */
+  TempHum(hexString) {
+    const modAdd = HexUtils.readNum(hexString, 0, 2);
+    const modId = MessageUtils.parseModuleId(hexString, 2);
     
     let tempHumData = [];
     let offset = 10;
     
-    // Parse up to 6 temperature/humidity sets
-    for (let i = 0; i < 6; i++) {
-      if (offset + 8 > hexString.length - 4) break; // Leave room for msgCode
+    // Parse up to maxSensors temperature/humidity sets
+    for (let i = 0; i < CONFIG.MESSAGE_FORMATS.TempHum.maxSensors; i++) {
+      if (offset + CONFIG.MESSAGE_FORMATS.TempHum.sensorSize > hexString.length - 4) break;
       
-      const thAdd = readNum(hexString, offset, 2);
-      
-      // Parse temperature as 4-byte value with 2 decimal places
-      const tempInt = readNum(hexString, offset + 2, 2);
-      const tempFrac = readNum(hexString, offset + 4, 2);
-      const temp = parseFloat(`${tempInt}.${tempFrac.toString().padStart(2, '0')}`);
-      
-      // Parse humidity as 4-byte value with 2 decimal places
-      const humInt = readNum(hexString, offset + 6, 2);
-      const humFrac = readNum(hexString, offset + 8, 2);
-      const hum = parseFloat(`${humInt}.${humFrac.toString().padStart(2, '0')}`);
+      const thAdd = HexUtils.readNum(hexString, offset, 2);
+      const temp = HexUtils.parseDecimalWithTwoPlaces(hexString, offset + 2);
+      const hum = HexUtils.parseDecimalWithTwoPlaces(hexString, offset + 6);
       
       tempHumData.push({
-        thAdd: thAdd,
+        add: thAdd,
         temp: temp,
         hum: hum
       });
       
-      offset += 10;
+      offset += CONFIG.MESSAGE_FORMATS.TempHum.sensorSize;
     }
     
     return {
-      msgType: "TempHum",
-      modAdd: modAdd,
-      modPort: null,
+      modNum: modAdd,
       modId: modId,
       payload: tempHumData
     };
-  } catch (error) {
-    logger.error(`[V5008 PARSER] Error parsing TempHum message: ${error.message}`);
-    return null;
-  }
-}
+  },
 
-/**
- * Parse Noise Level message
- * @param {string} hexString - The hex string to parse
- * @returns {Object|null} - Parsed Noise message object
- */
-function parseNoiseMessage(hexString) {
-  try {
-    // Format: [modAdd][modId(4B)] ( [nsAdd + nsLevel(4B)] x 3 ) [msgCode(4B)]
-    const modAdd = readNum(hexString, 0, 2);
-    const modIdHex = readHex(hexString, 2, 8);
-    const modId = parseInt(modIdHex, 16).toString();
+  /**
+   * Process noise payload
+   * @param {string} hexString - The hex string to parse
+   * @returns {Object} Processed payload
+   */
+  Noise(hexString) {
+    const modAdd = HexUtils.readNum(hexString, 0, 2);
+    const modId = MessageUtils.parseModuleId(hexString, 2);
     
     let noiseData = [];
     let offset = 10;
     
-    // Parse up to 3 noise level sets
-    for (let i = 0; i < 3; i++) {
-      if (offset + 12 > hexString.length - 4) break; // Leave room for msgCode
+    // Parse up to maxSensors noise level sets
+    for (let i = 0; i < CONFIG.MESSAGE_FORMATS.Noise.maxSensors; i++) {
+      if (offset + CONFIG.MESSAGE_FORMATS.Noise.sensorSize > hexString.length - 4) break;
       
-      const nsAdd = readNum(hexString, offset, 2);
-      const nsLevel = readNum(hexString, offset + 2, 8);
+      const nsAdd = HexUtils.readNum(hexString, offset, 2);
+      const nsLevel = HexUtils.readNum(hexString, offset + 2, 8);
       
       noiseData.push({
-        nsAdd: nsAdd,
-        nsLevel: nsLevel
+        add: nsAdd,
+        noise: nsLevel
       });
       
-      offset += 14;
+      offset += CONFIG.MESSAGE_FORMATS.Noise.sensorSize;
     }
     
     return {
-      msgType: "Noise",
-      modAdd: modAdd,
-      modPort: null,
+      modNum: modAdd,
       modId: modId,
       payload: noiseData
     };
-  } catch (error) {
-    logger.error(`[V5008 PARSER] Error parsing Noise message: ${error.message}`);
-    return null;
-  }
-}
+  },
 
-/**
- * Parse Door Status message (BA header)
- * @param {string} hexString - The hex string to parse
- * @returns {Object|null} - Parsed Door message object
- */
-function parseDoorMessage(hexString) {
-  try {
-    // Format: [BA][modAdd][modId(4B)][drStatus] [msgCode(4B)]
-    const modAdd = readNum(hexString, 2, 2);
-    const modIdHex = readHex(hexString, 4, 8);
-    const modId = parseInt(modIdHex, 16).toString();
-    const drStatus = "0x" + readHex(hexString, 12, 2);
+  /**
+   * Process door status payload
+   * @param {string} hexString - The hex string to parse
+   * @returns {Object} Processed payload
+   */
+  Door(hexString) {
+    const modAdd = HexUtils.readNum(hexString, 2, 2);
+    const modId = MessageUtils.parseModuleId(hexString, 4);
+    const drStatus = HexUtils.formatHexWithPrefix(hexString, 12, 2);
     
     return {
-      msgType: "Door",
-      modAdd: modAdd,
-      modPort: null,
+      modNum: modAdd,
       modId: modId,
       payload: {
-        drStatus: drStatus
+        status: drStatus
       }
     };
-  } catch (error) {
-    logger.error(`[V5008 PARSER] Error parsing Door message: ${error.message}`);
-    return null;
-  }
-}
+  },
 
-/**
- * Parse Device Info message (EF01 header)
- * @param {string} hexString - The hex string to parse
- * @returns {Object|null} - Parsed DeviceInfo message object
- */
-function parseDeviceInfoMessage(hexString) {
-  try {
-    // Format: [EF][01][deviceType(2B)][firmwareVer(4B)][ip(4B)][mask(4B)][gateway(4B)][mac(6B)][msgCode(4B)]
-    const deviceType = readHex(hexString, 4, 4);
-    const firmwareVerHex = readHex(hexString, 8, 8);
+  /**
+   * Process device info payload
+   * @param {string} hexString - The hex string to parse
+   * @returns {Object} Processed payload
+   */
+  DeviceInfo(hexString) {
+    const deviceType = HexUtils.readHex(hexString, 4, 4);
+    const firmwareVerHex = HexUtils.readHex(hexString, 8, 8);
     const firmwareVer = parseInt(firmwareVerHex, 16).toString();
     
-    // Parse IP address (each component is 1 byte, but represented as 2 hex chars)
-    const ip1 = readNum(hexString, 16, 2);
-    const ip2 = readNum(hexString, 18, 2);
-    const ip3 = readNum(hexString, 20, 2);
-    const ip4 = readNum(hexString, 22, 2);
-    const ip = `${ip1}.${ip2}.${ip3}.${ip4}`;
-    
-    // Parse subnet mask
-    const mask1 = readNum(hexString, 24, 2);
-    const mask2 = readNum(hexString, 26, 2);
-    const mask3 = readNum(hexString, 28, 2);
-    const mask4 = readNum(hexString, 30, 2);
-    const mask = `${mask1}.${mask2}.${mask3}.${mask4}`;
-    
-    // Parse gateway
-    const gw1 = readNum(hexString, 32, 2);
-    const gw2 = readNum(hexString, 34, 2);
-    const gw3 = readNum(hexString, 36, 2);
-    const gw4 = readNum(hexString, 38, 2);
-    const gateway = `${gw1}.${gw2}.${gw3}.${gw4}`;
-    
-    // Parse MAC address
-    const mac1 = readHex(hexString, 40, 2);
-    const mac2 = readHex(hexString, 42, 2);
-    const mac3 = readHex(hexString, 44, 2);
-    const mac4 = readHex(hexString, 46, 2);
-    const mac5 = readHex(hexString, 48, 2);
-    const mac6 = readHex(hexString, 50, 2);
-    const mac = `${mac1}:${mac2}:${mac3}:${mac4}:${mac5}:${mac6}`;
+    const ip = HexUtils.parseIpAddress(hexString, 16);
+    const mask = HexUtils.parseIpAddress(hexString, 24);
+    const gateway = HexUtils.parseIpAddress(hexString, 32);
+    const mac = HexUtils.parseMacAddress(hexString, 40);
     
     return {
-      msgType: "DeviceInfo",
-      modAdd: null,
-      modPort: null,
+      modNum: null,
       modId: null,
       payload: {
-        firmwareVer: firmwareVer,
+        fmVersion: firmwareVer,
         ip: ip,
         mask: mask,
         gateway: gateway,
         mac: mac
       }
     };
-  } catch (error) {
-    logger.error(`[V5008 PARSER] Error parsing DeviceInfo message: ${error.message}`);
-    return null;
-  }
-}
+  },
 
-/**
- * Parse Module Info message (EF02 header)
- * @param {string} hexString - The hex string to parse
- * @returns {Object|null} - Parsed ModuleInfo message object
- */
-function parseModuleInfoMessage(hexString) {
-  try {
-    // Format: [EF][02] ( [modAdd + modFirwareVer(6B)] x (until the rest bytes < 7) ) [msgCode(4B)]
+  /**
+   * Process module info payload
+   * @param {string} hexString - The hex string to parse
+   * @returns {Object} Processed payload
+   */
+  ModuleInfo(hexString) {
     let modules = [];
     let offset = 4;
     
     // Parse modules until we have less than 7 bytes left (for msgCode)
-    while (offset + 14 <= hexString.length - 4) {
-      const modAdd = readNum(hexString, offset, 2);
-      const modFirwareVerHex = readHex(hexString, offset + 2, 12);
+    while (offset + CONFIG.MESSAGE_FORMATS.ModuleInfo.moduleSize <= hexString.length - 4) {
+      const modAdd = HexUtils.readNum(hexString, offset, 2);
+      const modFirwareVerHex = HexUtils.readHex(hexString, offset + 2, 12);
       const modFirwareVer = parseInt(modFirwareVerHex, 16).toString();
       
       modules.push({
-        modAdd: modAdd,
-        modFirwareVer: modFirwareVer
+        add: modAdd,
+        fmVersion: modFirwareVer
       });
       
-      offset += 14;
+      offset += CONFIG.MESSAGE_FORMATS.ModuleInfo.moduleSize;
     }
     
     return {
-      msgType: "ModuleInfo",
-      modAdd: null,
-      modPort: null,
+      modNum: null,
       modId: null,
       payload: modules
     };
+  }
+};
+
+/**
+ * Message factory for creating normalized messages
+ */
+const MessageFactory = {
+  /**
+   * Create normalized message from parsed data
+   * @param {Object} deviceInfo - Device information from topic
+   * @param {string} msgType - Message type
+   * @param {Object} parsedData - Parsed message data
+   * @param {string} rawHexString - Original hex string
+   * @param {string} topic - Original topic
+   * @param {Object} meta - Additional metadata
+   * @returns {Object} Normalized message
+   */
+  createNormalizedMessage(deviceInfo, msgType, parsedData, rawHexString, topic, meta = {}) {
+    return {
+      deviceId: deviceInfo.deviceId,
+      deviceType: CONFIG.DEVICE_TYPE,
+      sensorType: deviceInfo.sensorType,
+      msgType: msgType,
+      modNum: parsedData.modNum,
+      modId: parsedData.modId,
+      ts: new Date().toISOString(),
+      payload: parsedData.payload,
+      meta: {
+        rawTopic: topic,
+        rawHexString: rawHexString,
+        ...meta,
+      },
+    };
+  }
+};
+
+/**
+ * Main parser function for V5008 messages
+ * @param {string} topic - MQTT topic
+ * @param {Buffer} message - Raw message buffer
+ * @param {Object} meta - Additional metadata
+ * @returns {Object|null} Normalized message or null on error
+ */
+function parse(topic, message, meta = {}) {
+  try {
+    // Extract device information from topic
+    const deviceInfo = MessageUtils.extractDeviceInfo(topic);
+    
+    // Debug logging
+    logger.debug(`[V5008 PARSER] Buffer length: ${message.length}`);
+    logger.debug(`[V5008 PARSER] Buffer content (hex): ${message.toString("hex")}`);
+    
+    // Convert buffer to hex string
+    const rawHexString = message.toString("hex").toUpperCase();
+    const header = rawHexString.substring(0, 2);
+    const subHeader = rawHexString.substring(2, 4);
+    
+    // Determine message type
+    const msgType = MessageUtils.determineMessageType(deviceInfo.sensorType, header, subHeader);
+    logger.debug(`[V5008 PARSER] Message Type: ${msgType}`);
+    
+    if (msgType === "Unknown") {
+      logger.error(`[V5008 PARSER] Unknown message type for header: ${header}${subHeader}`);
+      return null;
+    }
+    
+    // Process the message using the appropriate payload processor
+    const parsedData = PayloadProcessors[msgType](rawHexString);
+    
+    if (!parsedData) {
+      logger.error(`[V5008 PARSER] Failed to parse message: ${rawHexString}`);
+      return null;
+    }
+    
+    // Extract msgCode from the end of the hex string (last 8 characters = 4 bytes)
+    const msgCodeHex = rawHexString.slice(-8);
+    const msgId = parseInt(msgCodeHex, 16);
+    
+    // Create normalized message
+    const normalizedMessage = MessageFactory.createNormalizedMessage(
+      deviceInfo,
+      msgType,
+      parsedData,
+      rawHexString,
+      topic,
+      {
+        ...meta,
+        msgId: msgId
+      }
+    );
+    
+    logger.debug('[v5008parser] Normalized Message:\n', colorJson(normalizedMessage));
+    return normalizedMessage;
+    
   } catch (error) {
-    logger.error(`[V5008 PARSER] Error parsing ModuleInfo message: ${error.message}`);
+    logger.error(`V5008 parsing failed: ${error.message}`);
     return null;
   }
 }
-
-// Helper functions
-function readHex(str, start, len) {
-  return str.slice(start, start + len);
-}
-
-function readNum(str, start, len) {
-  return parseInt(str.slice(start, start + len), 16);
-}
-
 
 module.exports = { parse };

@@ -11,14 +11,14 @@ This document describes how to parse and normalize raw JSON messages from the V6
 3. Device ID is extracted from `gateway_sn` or `module_sn` field in the raw message.
 4. Message ID is extracted from `uuid_number` field in the raw message.
 5. All normalized JSON share a consistent structure:
-   ```json
+   
+```json
 {
   "deviceId":"<deviceId>",
   "deviceType":"V6800",
   "msgType":"Heartbeat" | "Rfid" | "TempHum" | "Noise" | "Door" | "DevModInfo",
   "sensorType":"<sensorType>",
-  "modAdd": null,
-  "modPort": <modPort>,
+  "modNum": <modNum>,
   "modId":"<modId>",
   "ts": "2025-09-25T07:56:31Z",
   "payload":{...},
@@ -69,8 +69,7 @@ V6800Upload/{device_id}/OpeAck
   "deviceType":"V6800",
   "msgType":"Heartbeat",
   "sensorType":"OpeAck",
-  "modAdd": null,
-  "modPort": null,
+  "modNum": null,
   "modId":null,
   "ts": "2025-09-25T07:56:31Z",
   "payload":[
@@ -130,8 +129,7 @@ V6800Upload/{device_id}/LabelState
   "deviceType":"V6800",
   "msgType":"Rfid",
   "sensorType":"LabelState",
-  "modAdd": null,
-  "modPort": 2,
+  "modNum": 2,
   "modId":"2349402517",
   "ts": "2025-09-25T07:56:31Z",
   "payload":{
@@ -199,8 +197,7 @@ V6800Upload/{device_id}/TemHum
   "deviceType":"V6800",
   "msgType":"TempHum",
   "sensorType":"TemHum",
-  "modAdd": null,
-  "modPort": 2,
+  "modNum": 2,
   "modId":"2349402517",
   "ts": "2025-09-25T07:56:31Z",
   "payload": [
@@ -267,8 +264,7 @@ V6800Upload/{device_id}/Noise
   "deviceType":"V6800",
   "msgType":"Noise",
   "sensorType":"Noise",
-  "modAdd": null,
-  "modPort": 2,
+  "modNum": 2,
   "modId":"2349402517",
   "ts": "2025-09-25T07:56:31Z",
   "payload":[
@@ -327,8 +323,7 @@ V6800Upload/{device_id}/OpeAck
   "deviceType":"V6800",
   "msgType":"Door",
   "sensorType":"OpeAck",
-  "modAdd": null,
-  "modPort": 2,
+  "modNum": 2,
   "modId":"2349402517",
   "ts": "2025-09-25T07:56:31Z",
   "payload": {
@@ -398,8 +393,7 @@ V6800Upload/{device_id}/OpeAck
   "deviceType":"V6800",
   "msgType":"DevModInfo",
   "sensorType":"OpeAck",
-  "modAdd": null,
-  "modPort": null,
+  "modNum": null,
   "modId":null,
   "ts": "2025-09-25T07:56:31Z",
   "payload": {
