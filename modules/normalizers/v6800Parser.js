@@ -14,9 +14,12 @@ const CONFIG = {
     "u_state_changed_notify_req": "Rfid",
     "u_state_resp": "RfidReq",
     "temper_humidity_exception_nofity_req": "TempHum",
+    "temper_humidity_resp": "TemHumReq",
     "noise_exception_nofity_req": "Noise",
     "door_state_changed_notify_req": "Door",
-    "devies_init_req": "DevModInfo"
+    "door_state_resp": "DoorReq",
+    "devies_init_req": "DevModInfo",
+    "u_color": "ColorReq"
   },
   
   // Sensor type mapping for each message type
@@ -25,9 +28,12 @@ const CONFIG = {
     "Rfid": "LabelState",
     "RfidReq": "LabelState",
     "TempHum": "TemHum",
+    "TemHumReq": "TemHum",
     "Noise": "Noise",
     "Door": "OpeAck",
-    "DevModInfo": "OpeAck"
+    "DoorReq": "OpeAck",
+    "DevModInfo": "OpeAck",
+    "ColorReq": "OpeAck"
   },
   
   // RFID state mapping
@@ -42,12 +48,21 @@ const CONFIG = {
  */
 const Utils = {
   /**
-   * Extract device ID from raw message with fallback options
-   * @param {Object} rawMessage - Raw message object
+   * Extract device ID from MQTT topic
+   * @param {Object} rawMessage - Raw message object (not used, kept for consistency)
+   * @param {string} topic - MQTT topic
    * @returns {string} Device ID
    */
-  getDeviceId(rawMessage) {
-    return rawMessage.gateway_sn || rawMessage.module_sn || "unknown";
+  getDeviceId(rawMessage, topic) {
+    // Extract from topic path: V6800Upload/2123456789/Door
+    if (topic) {
+      const topicParts = topic.split('/');
+      if (topicParts.length >= 2 && topicParts[1]) {
+        return topicParts[1];
+      }
+    }
+    
+    return "unknown";
   },
 
   /**
@@ -77,7 +92,7 @@ const Utils = {
    * @returns {Object} Base message structure
    */
   createBaseMessage(rawMessage, topic, msgType, meta = {}) {
-    const deviceId = Utils.getDeviceId(rawMessage);
+    const deviceId = Utils.getDeviceId(rawMessage, topic);
     const sensorType = CONFIG.SENSOR_TYPE_MAP[msgType] || CONFIG.DEFAULT_SENSOR_TYPE;
     
     return {
@@ -203,6 +218,17 @@ const PayloadProcessors = {
   },
 
   /**
+   * Process door state response payload
+   * @param {Object} rawMessage - Raw message object
+   * @returns {Object} Processed payload
+   */
+  DoorReq(rawMessage) {
+    return {
+      drStatus: Utils.formatDoorStatus(rawMessage.new_state)
+    };
+  },
+
+  /**
    * Process device & module info payload
    * @param {Object} rawMessage - Raw message
    * @returns {Object} Processed payload
@@ -221,6 +247,19 @@ const PayloadProcessors = {
         fmVersion: module.module_sw_version
       }))
     };
+  },
+
+  /**
+   * Process color payload
+   * @param {Object} portData - Port data object
+   * @returns {Array} Processed payload array
+   */
+  Color(portData) {
+    return portData.color_data.map(color => ({
+      pos: color.index,
+      color: color.color,
+      code: color.code
+    }));
   }
 };
 
@@ -240,23 +279,26 @@ const MessageFactory = {
       return baseMessage;
     }
     
+    // Use TempHum processor for TemHumReq since they have the same data structure
+    const processor = msgType === "TemHumReq" ? "TempHum" : msgType;
+    
     if (data.length === 1) {
       // Single port - return single message
       const portData = data[0];
       return {
         ...baseMessage,
-        modNum: portData.host_gateway_port_index || null,
-        modId: portData.extend_module_sn || null,
-        payload: PayloadProcessors[msgType](portData)
+        modNum: portData.host_gateway_port_index || portData.index || null,
+        modId: portData.extend_module_sn || portData.module_id || null,
+        payload: PayloadProcessors[processor](portData)
       };
     }
     
     // Multiple ports - return array of messages
     return data.map(portData => ({
       ...baseMessage,
-      modNum: portData.host_gateway_port_index,
-      modId: portData.extend_module_sn,
-      payload: PayloadProcessors[msgType](portData)
+      modNum: portData.host_gateway_port_index || portData.index,
+      modId: portData.extend_module_sn || portData.module_id,
+      payload: PayloadProcessors[processor](portData)
     }));
   },
 
@@ -301,6 +343,57 @@ const MessageFactory = {
   createPortBasedMessage(rawMessage, topic, msgType, meta) {
     const baseMessage = Utils.createBaseMessage(rawMessage, topic, msgType, meta);
     return MessageFactory.createPortSpecificMessages(rawMessage.data, baseMessage, msgType);
+  },
+
+  /**
+   * Create message for door state response type
+   * @param {Object} rawMessage - Raw message
+   * @param {string} topic - MQTT topic
+   * @param {Object} meta - Additional metadata
+   * @returns {Object} Normalized message
+   */
+  createDoorReqMessage(rawMessage, topic, meta) {
+    const baseMessage = Utils.createBaseMessage(rawMessage, topic, "DoorReq", meta);
+    return {
+      ...baseMessage,
+      modNum: rawMessage.host_gateway_port_index || null,
+      modId: rawMessage.extend_module_sn || null,
+      payload: PayloadProcessors.DoorReq(rawMessage)
+    };
+  },
+
+  /**
+   * Create message for color request type
+   * @param {Object} rawMessage - Raw message
+   * @param {string} topic - MQTT topic
+   * @param {Object} meta - Additional metadata
+   * @returns {Object|Array} Normalized message(s)
+   */
+  createColorMessage(rawMessage, topic, meta) {
+    const baseMessage = Utils.createBaseMessage(rawMessage, topic, "ColorReq", meta);
+    
+    if (!rawMessage.data || rawMessage.data.length === 0) {
+      return baseMessage;
+    }
+    
+    if (rawMessage.data.length === 1) {
+      // Single module - return single message
+      const moduleData = rawMessage.data[0];
+      return {
+        ...baseMessage,
+        modNum: moduleData.index,
+        modId: moduleData.module_id,
+        payload: PayloadProcessors.Color(moduleData)
+      };
+    }
+    
+    // Multiple modules - return array of messages
+    return rawMessage.data.map(moduleData => ({
+      ...baseMessage,
+      modNum: moduleData.index,
+      modId: moduleData.module_id,
+      payload: PayloadProcessors.Color(moduleData)
+    }));
   }
 };
 
@@ -340,9 +433,18 @@ function parse(topic, message, meta = {}) {
       case "Rfid":
       case "RfidReq":
       case "TempHum":
+      case "TemHumReq":
       case "Noise":
       case "Door":
         normalizedMessage = MessageFactory.createPortBasedMessage(rawMessage, topic, normalizedMsgType, meta);
+        break;
+      
+      case "ColorReq":
+        normalizedMessage = MessageFactory.createColorMessage(rawMessage, topic, meta);
+        break;
+      
+      case "DoorReq":
+        normalizedMessage = MessageFactory.createDoorReqMessage(rawMessage, topic, meta);
         break;
       
       default:
@@ -350,7 +452,16 @@ function parse(topic, message, meta = {}) {
         logger.warn(`[v6800parser] Unhandled V6800 message type: ${normalizedMsgType}`);
     }
     
-    logger.debug('[v6800parser] Normalized Message:\n', colorJson(normalizedMessage));
+    // Handle array messages for debug logging
+    if (Array.isArray(normalizedMessage)) {
+      logger.debug('[v6800parser] Normalized Messages (array):');
+      normalizedMessage.forEach((msg, index) => {
+        logger.debug(`[v6800parser] Message ${index + 1}:\n`, colorJson(msg));
+      });
+    } else {
+      logger.debug('[v6800parser] Normalized Message:\n', colorJson(normalizedMessage));
+    }
+    
     return normalizedMessage;
     
   } catch (error) {

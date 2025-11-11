@@ -127,27 +127,57 @@ class NormalizerRegistry {
         }
         
         // Return basic normalized message for unknown device types
-        return this.createBasicNormalizedMessage(topic, message, deviceType, meta);
+        const basicMessage = this.createBasicNormalizedMessage(topic, message, deviceType, meta);
+        if (!basicMessage) {
+          logger.warn(`Failed to create basic normalized message for topic: ${topic}`);
+          return null;
+        }
+        return basicMessage;
       }
 
       // Parse message with device-specific parser
       const normalizedMessage = parser.parse(topic, message, meta);
       
       if (normalizedMessage) {
-        // Add metadata
-        normalizedMessage.meta = {
-          ...normalizedMessage.meta,
-          //normalizedBy: deviceType,
-          //normalizedAt: new Date().toISOString(),
-          //parserVersion: this.parsers.get(deviceType).version
-        };
-        
-        logger.debug(`Message normalized for device type: ${deviceType}`, {
-          deviceId: normalizedMessage.deviceId,
-          sensorType: normalizedMessage.sensorType
-        });
-        
-        return normalizedMessage;
+        // Handle array of messages (e.g., from V6800 multi-port devices)
+        if (Array.isArray(normalizedMessage)) {
+          // Add metadata to each message in the array
+          const messagesWithMeta = normalizedMessage.map(msg => ({
+            ...msg,
+            meta: {
+              ...msg.meta,
+              //normalizedBy: deviceType,
+              //normalizedAt: new Date().toISOString(),
+              //parserVersion: this.parsers.get(deviceType).version
+            }
+          }));
+          
+          // Log info about the first message for debugging
+          if (messagesWithMeta.length > 0) {
+            logger.debug(`Message normalized for device type: ${deviceType}`, {
+              deviceId: messagesWithMeta[0].deviceId,
+              sensorType: messagesWithMeta[0].sensorType,
+              messageCount: messagesWithMeta.length
+            });
+          }
+          
+          return messagesWithMeta;
+        } else {
+          // Single message
+          normalizedMessage.meta = {
+            ...normalizedMessage.meta,
+            //normalizedBy: deviceType,
+            //normalizedAt: new Date().toISOString(),
+            //parserVersion: this.parsers.get(deviceType).version
+          };
+          
+          logger.debug(`Message normalized for device type: ${deviceType}`, {
+            deviceId: normalizedMessage.deviceId,
+            sensorType: normalizedMessage.sensorType
+          });
+          
+          return normalizedMessage;
+        }
       }
 
       logger.warn(`Parser for device type ${deviceType} returned null`);
@@ -168,14 +198,20 @@ class NormalizerRegistry {
    */
   createBasicNormalizedMessage(topic, message, deviceType, meta) {
     const topicParts = topic.split("/");
-    const gatewayId = topicParts[1] || "unknown";
-    const sensorType = topicParts[2] || "unknown";
+    const gatewayId = topicParts[1];
+    const sensorType = topicParts[2];
+
+    // If we can't extract a valid gateway ID from the topic, don't create a message
+    if (!gatewayId || gatewayId === "unknown" || gatewayId === "") {
+      logger.warn(`Cannot extract valid device ID from topic: ${topic}`);
+      return null;
+    }
 
     return {
       deviceId: gatewayId,
       deviceType: deviceType,
-      sensorType: sensorType,
-      sensorId: `${gatewayId}-${sensorType}`,
+      sensorType: sensorType || "unknown",
+      sensorId: `${gatewayId}-${sensorType || "unknown"}`,
       ts: new Date().toISOString(),
       payload: typeof message === "string" ? message : message.toString(),
       meta: {

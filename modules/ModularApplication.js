@@ -69,13 +69,28 @@ class ModularApplication extends BaseComponent {
         return;
       }
 
-      // Store in data store
-      if (dataStore && dataStore.handleMessage) {
-        dataStore.handleMessage(normalized);
-      }
+      // Handle array of messages (e.g., from V6800 multi-port devices)
+      if (Array.isArray(normalized)) {
+        // Process each message individually
+        for (const msg of normalized) {
+          // Store in data store
+          if (dataStore && dataStore.handleMessage) {
+            dataStore.handleMessage(msg);
+          }
 
-      // Emit processed message event
-      eventBus.emit("message.processed", normalized);
+          // Emit processed message event for each message
+          eventBus.emit("message.processed", msg);
+        }
+      } else {
+        // Single message
+        // Store in data store
+        if (dataStore && dataStore.handleMessage) {
+          dataStore.handleMessage(normalized);
+        }
+
+        // Emit processed message event
+        eventBus.emit("message.processed", normalized);
+      }
     } catch (error) {
       logger.error("Error handling MQTT message:", error);
       eventBus.emit("message.error", { error, data });
