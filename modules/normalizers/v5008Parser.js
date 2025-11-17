@@ -21,7 +21,29 @@ const CONFIG = {
     "CC": "Heartbeat",
     "BA": "Door",
     "EF01": "DeviceInfo",
-    "EF02": "ModuleInfo"
+    "EF02": "ModuleInfo",
+    "E4": "ColorReq",
+    "E2": "CleanRfidTamperAlarm",
+    "E1": "CleanSetResponse"
+  },
+  
+  // Color name mapping for color codes
+  COLOR_NAME_MAP: {
+    "0": "off",
+    "1": "red",
+    "2": "purple",
+    "3": "yellow",
+    "4": "green",
+    "5": "cyan",
+    "6": "blue",
+    "7": "white",
+    "8": "red_f",
+    "9": "purple_f",
+    "10": "yellow_f", // "0x0a"
+    "11": "green_f",  // "0x0b"
+    "12": "cyan_f",   // "0x0c"
+    "13": "blue_f",   // "0x0d"
+    "14": "white_f"   // "0x0e"
   },
   
   // Message format specifications
@@ -53,6 +75,15 @@ const CONFIG = {
     ModuleInfo: {
       header: "EF02",
       moduleSize: 14
+    },
+    ColorReq: {
+      header: "E4"
+    },
+    CleanRfidTamperAlarm: {
+      header: "E2"
+    },
+    CleanSetResponse: {
+      header: "E1"
     }
   }
 };
@@ -214,10 +245,11 @@ const PayloadProcessors = {
       const modId = MessageUtils.parseModuleId(hexString, offset + 2);
       const uCount = HexUtils.readNum(hexString, offset + 10, 2);
       
-      // Only include valid module addresses
-      if (modAdd >= format.validModRange.min && modAdd <= format.validModRange.max) {
+      // Only include valid module addresses and non-empty/zero modId
+      if (modAdd >= format.validModRange.min && modAdd <= format.validModRange.max &&
+          modId && modId !== "" && modId !== "0") {
         modules.push({
-          num: modAdd,
+          modNum: modAdd,
           modId: modId,
           uCount: uCount
         });
@@ -384,7 +416,7 @@ const PayloadProcessors = {
       modNum: null,
       modId: null,
       payload: {
-        fmVersion: firmwareVer,
+        fwVersion: firmwareVer,
         ip: ip,
         mask: mask,
         gateway: gateway,
@@ -410,7 +442,7 @@ const PayloadProcessors = {
       
       modules.push({
         add: modAdd,
-        fmVersion: modFirwareVer
+        fwVersion: modFirwareVer
       });
       
       offset += CONFIG.MESSAGE_FORMATS.ModuleInfo.moduleSize;
@@ -420,6 +452,189 @@ const PayloadProcessors = {
       modNum: null,
       modId: null,
       payload: modules
+    };
+  },
+
+  /**
+   * Process color request response payload
+   * @param {string} hexString - The hex string to parse
+   * @returns {Object} Processed payload
+   */
+  ColorReq(hexString) {
+    // Format: [AA][deviceId(4B)][cmdResult][E4][modNum]([color] x n) [msgId(4B)]
+    
+    // Skip AA header (1 byte)
+    // Extract device ID (4 bytes)
+    const deviceId = HexUtils.readHex(hexString, 2, 8);
+    
+    // Extract cmdResult (1 byte)
+    const cmdResult = HexUtils.readNum(hexString, 10, 2);
+    
+    // Verify E4 header (1 byte)
+    const e4Header = HexUtils.readHex(hexString, 12, 2);
+    if (e4Header !== "E4") {
+      throw new Error(`Invalid E4 header: ${e4Header}`);
+    }
+    
+    // Extract modNum (1 byte)
+    const modNum = HexUtils.readNum(hexString, 14, 2);
+    
+    // Calculate the number of color entries
+    // Total length - 24 bytes (AA + deviceId + cmdResult + E4 + modNum + msgId) = color data length
+    const colorDataLength = hexString.length - 24;
+    const colorCount = colorDataLength / 2; // Each color is 1 byte (2 hex chars)
+    
+    let colorData = [];
+    let offset = 16; // Start after AA, deviceId, cmdResult, E4, and modNum
+    
+    // Parse each color entry
+    for (let i = 0; i < colorCount; i++) {
+      if (offset + 2 > hexString.length - 8) break; // Leave room for msgId (4 bytes)
+      
+      const colorCode = HexUtils.readNum(hexString, offset, 2).toString();
+      const colorName = CONFIG.COLOR_NAME_MAP[colorCode] || "unknown";
+      
+      colorData.push({
+        num: i + 1,
+        color: colorName
+      });
+      
+      offset += 2;
+    }
+    
+    // Determine result based on cmdResult
+    const resultStatus = cmdResult === 0xA1 ? "success" : "failure";
+    
+    return {
+      modNum: null,
+      modId: null,
+      payload: colorData,
+      meta: {
+        result: resultStatus
+      }
+    };
+  },
+
+  /**
+   * Process clean RFID tamper alarm response payload
+   * @param {string} hexString - The hex string to parse
+   * @returns {Object} Processed payload
+   */
+  CleanRfidTamperAlarm(hexString) {
+    // Format: [AA][deviceId(4B)][cmdResult][cmdString(nB)][msgId(4B)]
+    // cmdString - [E2][modNum]([num]...)
+    
+    // Skip AA header (1 byte)
+    // Extract device ID (4 bytes)
+    const deviceId = HexUtils.readHex(hexString, 2, 8);
+    
+    // Extract cmdResult (1 byte)
+    const cmdResult = HexUtils.readNum(hexString, 10, 2);
+    
+    // Verify E2 header in cmdString (1 byte)
+    const e2Header = HexUtils.readHex(hexString, 12, 2);
+    if (e2Header !== "E2") {
+      throw new Error(`Invalid E2 header: ${e2Header}`);
+    }
+    
+    // Extract modNum (1 byte)
+    const modNum = HexUtils.readNum(hexString, 14, 2);
+    
+    // Calculate the number of num entries
+    // Total length - 20 bytes (AA + deviceId + cmdResult + E2 + modNum + msgId) = num data length
+    const numDataLength = hexString.length - 20;
+    const numCount = numDataLength / 2; // Each num is 1 byte (2 hex chars)
+    
+    let numData = [];
+    let offset = 16; // Start after AA, deviceId, cmdResult, E2, and modNum
+    
+    // Parse each num entry
+    for (let i = 0; i < numCount; i++) {
+      if (offset + 2 > hexString.length - 8) break; // Leave room for msgId (4 bytes)
+      
+      const num = HexUtils.readNum(hexString, offset, 2);
+      numData.push(num);
+      
+      offset += 2;
+    }
+    
+    // Determine result based on cmdResult
+    const resultStatus = cmdResult === 0xA1 ? "success" : "failure";
+    
+    return {
+      modNum: null,
+      modId: null,
+      payload: {
+        modNum: modNum,
+        num: numData
+      },
+      meta: {
+        result: resultStatus
+      }
+    };
+  },
+
+  /**
+   * Process clean set response payload
+   * @param {string} hexString - The hex string to parse
+   * @returns {Object} Processed payload
+   */
+  CleanSetResponse(hexString) {
+    // Format: [AA][deviceId(4B)][cmdResult][cmdString(nB)][msgId(4B)]
+    // cmdString - [E1][modNum]([num][colorCode]...)
+    
+    // Skip AA header (1 byte)
+    // Extract device ID (4 bytes)
+    const deviceId = HexUtils.readHex(hexString, 2, 8);
+    
+    // Extract cmdResult (1 byte)
+    const cmdResult = HexUtils.readNum(hexString, 10, 2);
+    
+    // Verify E1 header in cmdString (1 byte)
+    const e1Header = HexUtils.readHex(hexString, 12, 2);
+    if (e1Header !== "E1") {
+      throw new Error(`Invalid E1 header: ${e1Header}`);
+    }
+    
+    // Extract modNum (1 byte)
+    const modNum = HexUtils.readNum(hexString, 14, 2);
+    
+    // Calculate the number of entries
+    // Each entry has 2 bytes: num (1 byte) + colorCode (1 byte)
+    // Total length - 20 bytes (AA + deviceId + cmdResult + E1 + modNum + msgId) = entry data length
+    // But with the actual example, we have less bytes, so adjust calculation
+    const entryDataLength = hexString.length - 20;
+    const entryCount = Math.floor(entryDataLength / 2);
+    
+    let colorData = [];
+    let offset = 16; // Start after AA, deviceId, cmdResult, E1, and modNum
+    
+    // Parse each entry (num + colorCode)
+    for (let i = 0; i < entryCount; i++) {
+      if (offset + 4 > hexString.length - 8) break; // Leave room for msgId (4 bytes)
+      
+      const num = HexUtils.readNum(hexString, offset, 2);
+      const colorCode = HexUtils.readNum(hexString, offset + 2, 2);
+      const colorName = CONFIG.COLOR_NAME_MAP[colorCode.toString()] || "unknown";
+      
+      colorData.push({
+        num: num,
+        color: colorName
+      });
+      
+      offset += 4;
+    }
+    
+    // Determine result based on cmdResult
+    const resultStatus = cmdResult === 0xA1 ? "success" : "failure";
+    
+    return {
+      modNum: null,
+      modId: null,
+      payload: colorData,
+      meta: {
+        result: resultStatus
+      }
     };
   }
 };
@@ -479,7 +694,18 @@ function parse(topic, message, meta = {}) {
     const subHeader = rawHexString.substring(2, 4);
     
     // Determine message type
-    const msgType = MessageUtils.determineMessageType(deviceInfo.sensorType, header, subHeader);
+    let msgType = MessageUtils.determineMessageType(deviceInfo.sensorType, header, subHeader);
+    
+    // Special handling for ColorReq messages with E4 header at position 6
+    if (msgType === "Unknown" && deviceInfo.sensorType === "OpeAck" && rawHexString.length >= 14) {
+      const e4Header = rawHexString.substring(12, 14);
+      if (e4Header === "E4") {
+        msgType = "ColorReq";
+      } else if (e4Header === "E2") {
+        msgType = "CleanRfidTamperAlarm";
+      }
+    }
+    
     logger.debug(`[V5008 PARSER] Message Type: ${msgType}`);
     
     if (msgType === "Unknown") {
@@ -508,7 +734,8 @@ function parse(topic, message, meta = {}) {
       topic,
       {
         ...meta,
-        msgId: msgId
+        msgId: msgId,
+        ...(parsedData.meta || {}) // Include any meta from payload processor
       }
     );
     

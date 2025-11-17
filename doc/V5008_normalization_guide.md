@@ -74,11 +74,11 @@ valid value only modAdd from 1-5;
   "ts": "2025-09-25T07:56:31Z",
   
   "payload":[
-    { "num": 1, "modId" : '3963041727', "uCount"  : 12 },
-    { "num": 2, "modId" : '2349402517', "uCount"  : 18 },
-    { "num": 3, "modId" : '0',          "uCount"  : 0 },
-    { "num": 4, "modId" : '0',          "uCount"  : 0 },
-    { "num": 5, "modId" : '0',          "uCount"  : 0 }
+    { "modNum": 1, "modId" : '3963041727', "uCount"  : 12 },
+    { "modNum": 2, "modId" : '2349402517', "uCount"  : 18 },
+    { "modNum": 3, "modId" : '0',          "uCount"  : 0 },
+    { "modNum": 4, "modId" : '0',          "uCount"  : 0 },
+    { "modNum": 5, "modId" : '0',          "uCount"  : 0 }
   ],
   
   "meta":{

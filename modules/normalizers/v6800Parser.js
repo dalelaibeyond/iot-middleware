@@ -19,7 +19,9 @@ const CONFIG = {
     "door_state_changed_notify_req": "Door",
     "door_state_resp": "DoorReq",
     "devies_init_req": "DevModInfo",
-    "u_color": "ColorReq"
+    "u_color": "ColorReq",
+    "set_module_property_result_req": "SetColor",
+    "clear_u_warning": "CleanRfidTamperAlarm"
   },
   
   // Sensor type mapping for each message type
@@ -33,7 +35,9 @@ const CONFIG = {
     "Door": "OpeAck",
     "DoorReq": "OpeAck",
     "DevModInfo": "OpeAck",
-    "ColorReq": "OpeAck"
+    "ColorReq": "OpeAck",
+    "SetColor": "OpeAck",
+    "CleanRfidTamperAlarm": "OpeAck"
   },
   
   // RFID state mapping
@@ -235,7 +239,7 @@ const PayloadProcessors = {
    */
   DevModInfo(rawMessage) {
     return {
-      fmVersion: null,
+      fwVersion: null,
       ip: rawMessage.gateway_ip,
       mask: null,
       gateway: null,
@@ -244,7 +248,7 @@ const PayloadProcessors = {
         modNum: module.module_index,
         modId: module.module_sn,
         uCount: module.module_u_num,
-        fmVersion: module.module_sw_version
+        fwVersion: module.module_sw_version
       }))
     };
   },
@@ -259,6 +263,32 @@ const PayloadProcessors = {
       pos: color.index,
       color: color.color,
       code: color.code
+    }));
+  },
+
+  /**
+   * Process color set result payload
+   * @param {Array} data - Raw data array
+   * @returns {Array} Processed payload array
+   */
+  SetColor(data) {
+    return data.map(module => ({
+      modNum: module.host_gateway_port_index,
+      modId: module.extend_module_sn,
+      result: module.set_property_result === 0 ? "success" : "fail"
+    }));
+  },
+
+  /**
+   * Process clean RFID tamper alarm payload
+   * @param {Array} data - Raw data array
+   * @returns {Array} Processed payload array
+   */
+  CleanRfidTamperAlarm(data) {
+    return data.map(module => ({
+      modNum: module.index,
+      modId: module.module_id,
+      result: module.ctr_flag === true ? "success" : "fail"
     }));
   }
 };
@@ -394,6 +424,36 @@ const MessageFactory = {
       modId: moduleData.module_id,
       payload: PayloadProcessors.Color(moduleData)
     }));
+  },
+
+  /**
+   * Create message for color set result type
+   * @param {Object} rawMessage - Raw message
+   * @param {string} topic - MQTT topic
+   * @param {Object} meta - Additional metadata
+   * @returns {Object} Normalized message
+   */
+  createSetColorMessage(rawMessage, topic, meta) {
+    const baseMessage = Utils.createBaseMessage(rawMessage, topic, "SetColor", meta);
+    return {
+      ...baseMessage,
+      payload: PayloadProcessors.SetColor(rawMessage.data)
+    };
+  },
+
+  /**
+   * Create message for clean RFID tamper alarm type
+   * @param {Object} rawMessage - Raw message
+   * @param {string} topic - MQTT topic
+   * @param {Object} meta - Additional metadata
+   * @returns {Object} Normalized message
+   */
+  createCleanRfidTamperAlarmMessage(rawMessage, topic, meta) {
+    const baseMessage = Utils.createBaseMessage(rawMessage, topic, "CleanRfidTamperAlarm", meta);
+    return {
+      ...baseMessage,
+      payload: PayloadProcessors.CleanRfidTamperAlarm(rawMessage.data)
+    };
   }
 };
 
@@ -441,6 +501,14 @@ function parse(topic, message, meta = {}) {
       
       case "ColorReq":
         normalizedMessage = MessageFactory.createColorMessage(rawMessage, topic, meta);
+        break;
+      
+      case "SetColor":
+        normalizedMessage = MessageFactory.createSetColorMessage(rawMessage, topic, meta);
+        break;
+      
+      case "CleanRfidTamperAlarm":
+        normalizedMessage = MessageFactory.createCleanRfidTamperAlarmMessage(rawMessage, topic, meta);
         break;
       
       case "DoorReq":

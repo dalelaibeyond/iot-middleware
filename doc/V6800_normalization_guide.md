@@ -16,7 +16,7 @@ This document describes how to parse and normalize raw JSON messages from the V6
 {
   "deviceId":"<deviceId>",
   "deviceType":"V6800",
-  "msgType":"Heartbeat" | "Rfid" | "TempHum" | "Noise" | "Door" | "DevModInfo",
+  "msgType":"Heartbeat" | "Rfid" | "TempHum" | "Noise" | "Door" | "DevModInfo" | "ColorReq" | "SetColor" | "CleanRfidTamperAlarm",
   "sensorType":"<sensorType>",
   "modNum": <modNum>,
   "modId":"<modId>",
@@ -415,6 +415,131 @@ V6800Upload/{device_id}/OpeAck
 
 ---
 
+## 🎨 7. Color Set Result
+
+**MQTT Topic:**
+
+```
+V6800Upload/{device_id}/OpeAck
+```
+
+**Raw Format:**
+
+```json
+{
+  "msg_type": "set_module_property_result_req",
+  "gateway_sn": "2123456789",
+  "set_property_type": 8001,
+  "uuid_number": 871147680,
+  "data": [
+    { "host_gateway_port_index": 2, "extend_module_sn": "3963041727", "module_type": "mt_ul", "set_property_result": 0 },
+    { "host_gateway_port_index": 4, "extend_module_sn": "2349402517", "module_type": "mt_ul", "set_property_result": 0 }
+  ]
+}
+```
+
+**Field Mapping:**
+- `deviceId`: `gateway_sn`
+- `msgId`: `uuid_number`
+- `modNum`: `null` (not applicable for color set result)
+- `modId`: `null` (not applicable for color set result)
+- `payload[].modNum`: `host_gateway_port_index`
+- `payload[].modId`: `extend_module_sn`
+- `payload[].result`: "success" if `set_property_result=0`, "fail" if `set_property_result=1`
+
+**Normalized JSON:**
+
+```json
+{
+  "deviceId": "2123456789",
+  "deviceType": "V6800",
+  "sensorType": "OpeAck",
+  "msgType": "SetColor",
+  "modNum": null,
+  "modId": null,
+  "ts": "2025-11-13T01:17:25.076Z",
+  "meta": {
+    "rawTopic": "V6800Upload/2123456789/OpeAck",
+    "msgId": 871147680,
+    "msgType": "set_module_property_result_req"
+  },
+  "payload": [
+    { "modNum": 2, "modId": "3963041727", "result": "success" },
+    { "modNum": 4, "modId": "2349402517", "result": "success" }
+  ]
+}
+```
+
+---
+
+## 🧹 8. Clean RFID Tamper Alarm
+
+**MQTT Topic:**
+
+```
+V6800Upload/{device_id}/OpeAck
+```
+
+**Raw Format:**
+
+```json
+{
+  "msg_type": "clear_u_warning",
+  "gateway_id": "2123456789",
+  "count": 2,
+  "uuid_number": 2140580699,
+  "code": 1346589,
+  "data": [
+    {
+      "index": 2,
+      "module_id": "3963041727",
+      "u_num": 6,
+      "ctr_flag": true
+    },
+    {
+      "index": 4,
+      "module_id": "2349402517",
+      "u_num": 12,
+      "ctr_flag": true
+    }
+  ]
+}
+```
+
+**Field Mapping:**
+- `deviceId`: `gateway_id` (extracted from topic if not present)
+- `msgId`: `uuid_number`
+- `modNum`: `null` (not applicable for clean alarm result)
+- `modId`: `null` (not applicable for clean alarm result)
+- `payload[].modNum`: `index`
+- `payload[].modId`: `module_id`
+- `payload[].result`: "success" if `ctr_flag=true`, "fail" if `ctr_flag=false`
+
+**Normalized JSON:**
+
+```json
+{
+  "deviceId": "2123456789",
+  "deviceType": "V6800",
+  "sensorType": "OpeAck",
+  "msgType": "CleanRfidTamperAlarm",
+  "modNum": null,
+  "modId": null,
+  "ts": "2025-11-13T01:17:25.076Z",
+  "meta": {
+    "rawTopic": "V6800Upload/2123456789/OpeAck",
+    "msgId": 2140580699,
+    "msgType": "clear_u_warning"
+  },
+  "payload": [
+    { "modNum": 2, "modId": "3963041727", "result": "success" },
+    { "modNum": 4, "modId": "2349402517", "result": "success" }
+  ]
+}
+```
+
+---
+
 ## 🧩 Summary Table
 
 | Message Type | MQTT Topic | msg_type | Normalized Type | Notes |
@@ -425,6 +550,9 @@ V6800Upload/{device_id}/OpeAck
 | Noise Level | `Noise` | `noise_exception_nofity_req` | `Noise` | 3 sets per module |
 | Door Status | `OpeAck` | `door_state_changed_notify_req` | `Door` | Rack door open/close |
 | Device & Module Info | `OpeAck` | `devies_init_req` | `DevModInfo` | Device network and module info |
+| Color Request | `OpeAck` | `u_color` | `ColorReq` | Color setting request |
+| Color Set Result | `OpeAck` | `set_module_property_result_req` | `SetColor` | Response to color setting |
+| Clean RFID Tamper Alarm | `OpeAck` | `clear_u_warning` | `CleanRfidTamperAlarm` | Response to tamper alarm clear command |
 
 ---
 
@@ -441,7 +569,10 @@ const MSG_TYPE_MAP = {
   "temper_humidity_exception_nofity_req": "TempHum",
   "noise_exception_nofity_req": "Noise",
   "door_state_changed_notify_req": "Door",
-  "devies_init_req": "DevModInfo"
+  "devies_init_req": "DevModInfo",
+  "u_color": "ColorReq",
+  "set_module_property_result_req": "SetColor",
+  "clear_u_warning": "CleanRfidTamperAlarm"
 };
 ```
 
@@ -502,4 +633,4 @@ const formatDoorStatus = (newState) => {
 
 📘 **End of Document**
 
-*Last updated: 2025-10-28*
+*Last updated: 2025-11-13*
