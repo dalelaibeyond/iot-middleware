@@ -23,8 +23,8 @@ const CONFIG = {
     "EF01": "DeviceInfo",
     "EF02": "ModuleInfo",
     "E4": "ColorReq",
-    "E2": "CleanRfidTamperAlarm",
-    "E1": "CleanSetResponse"
+    "E2": "ClrTamperAlarmResponse",
+    "E1": "ColorSetResponse"
   },
   
   // Color name mapping for color codes
@@ -64,7 +64,7 @@ const CONFIG = {
     },
     Noise: {
       maxSensors: 3,
-      sensorSize: 14
+      sensorSize: 10  // 1 byte for add + 4 bytes for noise = 5 bytes = 10 hex characters
     },
     Door: {
       header: "BA"
@@ -79,10 +79,10 @@ const CONFIG = {
     ColorReq: {
       header: "E4"
     },
-    CleanRfidTamperAlarm: {
+    ClrTamperAlarmResponse: {
       header: "E2"
     },
-    CleanSetResponse: {
+    ColorSetResponse: {
       header: "E1"
     }
   }
@@ -354,21 +354,21 @@ const PayloadProcessors = {
     const modId = MessageUtils.parseModuleId(hexString, 2);
     
     let noiseData = [];
-    let offset = 10;
+    let offset = 10; // Start after modNum(1) + modId(4) = 5 bytes = 10 hex chars
     
     // Parse up to maxSensors noise level sets
     for (let i = 0; i < CONFIG.MESSAGE_FORMATS.Noise.maxSensors; i++) {
-      if (offset + CONFIG.MESSAGE_FORMATS.Noise.sensorSize > hexString.length - 4) break;
+      if (offset + CONFIG.MESSAGE_FORMATS.Noise.sensorSize > hexString.length - 8) break; // Leave room for msgId (4 bytes = 8 hex chars)
       
-      const nsAdd = HexUtils.readNum(hexString, offset, 2);
-      const nsLevel = HexUtils.readNum(hexString, offset + 2, 8);
+      const nsAdd = HexUtils.readNum(hexString, offset, 2); // 1 byte for add
+      const nsLevel = HexUtils.readNum(hexString, offset + 2, 8); // 4 bytes for noise
       
       noiseData.push({
         add: nsAdd,
         noise: nsLevel
       });
       
-      offset += CONFIG.MESSAGE_FORMATS.Noise.sensorSize;
+      offset += CONFIG.MESSAGE_FORMATS.Noise.sensorSize; // 10 hex chars = 5 bytes (1 add + 4 noise)
     }
     
     return {
@@ -520,7 +520,7 @@ const PayloadProcessors = {
    * @param {string} hexString - The hex string to parse
    * @returns {Object} Processed payload
    */
-  CleanRfidTamperAlarm(hexString) {
+  ClrTamperAlarmResponse(hexString) {
     // Format: [AA][deviceId(4B)][cmdResult][cmdString(nB)][msgId(4B)]
     // cmdString - [E2][modNum]([num]...)
     
@@ -575,13 +575,13 @@ const PayloadProcessors = {
   },
 
   /**
-   * Process clean set response payload
+   * Process color set response payload
    * @param {string} hexString - The hex string to parse
    * @returns {Object} Processed payload
    */
-  CleanSetResponse(hexString) {
+  ColorSetResponse(hexString) {
     // Format: [AA][deviceId(4B)][cmdResult][cmdString(nB)][msgId(4B)]
-    // cmdString - [E1][modNum]([num][colorCode]...)
+    // cmdString - [E1][modNum](([num][colorCode]) x n)
     
     // Skip AA header (1 byte)
     // Extract device ID (4 bytes)
@@ -599,12 +599,11 @@ const PayloadProcessors = {
     // Extract modNum (1 byte)
     const modNum = HexUtils.readNum(hexString, 14, 2);
     
-    // Calculate the number of entries
+    // Calculate the number of color entries
+    // Total length - 20 bytes (AA + deviceId + cmdResult + E1 + modNum + msgId) = color data length
     // Each entry has 2 bytes: num (1 byte) + colorCode (1 byte)
-    // Total length - 20 bytes (AA + deviceId + cmdResult + E1 + modNum + msgId) = entry data length
-    // But with the actual example, we have less bytes, so adjust calculation
-    const entryDataLength = hexString.length - 20;
-    const entryCount = Math.floor(entryDataLength / 2);
+    const colorDataLength = hexString.length - 20;
+    const entryCount = Math.floor(colorDataLength / 4); // Each entry is 4 hex chars (2 bytes)
     
     let colorData = [];
     let offset = 16; // Start after AA, deviceId, cmdResult, E1, and modNum
@@ -696,13 +695,15 @@ function parse(topic, message, meta = {}) {
     // Determine message type
     let msgType = MessageUtils.determineMessageType(deviceInfo.sensorType, header, subHeader);
     
-    // Special handling for ColorReq messages with E4 header at position 6
+    // Special handling for OpeAck messages with command headers at position 6
     if (msgType === "Unknown" && deviceInfo.sensorType === "OpeAck" && rawHexString.length >= 14) {
-      const e4Header = rawHexString.substring(12, 14);
-      if (e4Header === "E4") {
+      const cmdHeader = rawHexString.substring(12, 14);
+      if (cmdHeader === "E4") {
         msgType = "ColorReq";
-      } else if (e4Header === "E2") {
-        msgType = "CleanRfidTamperAlarm";
+      } else if (cmdHeader === "E2") {
+        msgType = "ClrTamperAlarmResponse";
+      } else if (cmdHeader === "E1") {
+        msgType = "ColorSetResponse";
       }
     }
     
@@ -721,9 +722,9 @@ function parse(topic, message, meta = {}) {
       return null;
     }
     
-    // Extract msgCode from the end of the hex string (last 8 characters = 4 bytes)
-    const msgCodeHex = rawHexString.slice(-8);
-    const msgId = parseInt(msgCodeHex, 16);
+    // Extract msgId from the end of the hex string (last 8 characters = 4 bytes)
+    const msgIdHex = rawHexString.slice(-8);
+    const msgId = parseInt(msgIdHex, 16);
     
     // Create normalized message
     const normalizedMessage = MessageFactory.createNormalizedMessage(

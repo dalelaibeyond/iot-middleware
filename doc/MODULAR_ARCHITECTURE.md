@@ -1,17 +1,29 @@
 # IoT Middleware v3 - Modular Architecture Guide
 
+Last updated: 2025-11-17 | Version: 1.0
+
+**Related Documentation:**
+- [Event System Guide](event.md) - Detailed event flow and handling
+- [V5008 Message Format Guide](V5008-MQTT-Message-Format-and-Normalization-Guide.md) - V5008 device implementation
+- [V6800 Message Format Guide](V6800-MQTT-Message-Format-and-Normalization-Guide.md) - V6800 device implementation
+
 ## Table of Contents
 
 1. [Architecture Overview](#architecture-overview)
-2. [Core Components](#core-components)
-3. [Module System](#module-system)
-4. [Event-Driven Communication](#event-driven-communication)
-5. [Component Lifecycle](#component-lifecycle)
-6. [Data Flow](#data-flow)
-7. [Configuration System](#configuration-system)
-8. [Extensibility Points](#extensibility-points)
-9. [Design Patterns](#design-patterns)
-10. [Implementation Guidelines](#implementation-guidelines)
+2. [System Architecture Diagram](#system-architecture-diagram)
+3. [Core Components](#core-components)
+4. [Module System](#module-system)
+5. [Event-Driven Communication](#event-driven-communication)
+6. [Component Lifecycle](#component-lifecycle)
+7. [Data Flow](#data-flow)
+8. [Configuration System](#configuration-system)
+9. [Extensibility Points](#extensibility-points)
+10. [Design Patterns](#design-patterns)
+11. [Implementation Guidelines](#implementation-guidelines)
+12. [Testing Strategies](#testing-strategies)
+13. [Deployment Considerations](#deployment-considerations)
+14. [Performance Guidelines](#performance-guidelines)
+15. [Troubleshooting](#troubleshooting)
 
 ## Architecture Overview
 
@@ -24,6 +36,105 @@ IoT Middleware v3 is built on a modular, event-driven architecture that enables 
 3. **Configuration-Driven**: Behavior is controlled through configuration, not code changes
 4. **Fault Tolerance**: System continues operating even when optional components fail
 5. **Extensibility**: New functionality can be added without modifying existing code
+6. **Observability**: Built-in monitoring and logging for all components
+7. **Testability**: Each component can be tested in isolation
+
+## System Architecture Diagram
+
+```mermaid
+graph TB
+    subgraph "External Systems"
+        A[IoT Devices]
+        B[MQTT Broker]
+        C[Database]
+        D[Web Clients]
+        E[External APIs]
+    end
+    
+    subgraph "IoT Middleware v3"
+        subgraph "Core Layer"
+            F[ModularApplication]
+            G[ComponentRegistry]
+            H[EventBus]
+            I[BaseComponent]
+        end
+        
+        subgraph "Module Layer"
+            J[Core Module]
+            K[Storage Module]
+            L[API Module]
+            M[Relay Module]
+            N[Security Module]
+            O[Monitoring Module]
+            P[Processing Module]
+            Q[Resilience Module]
+        end
+        
+        subgraph "Component Layer"
+            R[MQTT Client]
+            S[Normalizer]
+            T[Data Store]
+            U[Database Manager]
+            V[Cache Manager]
+            W[REST API]
+            X[WebSocket Server]
+            Y[Message Relay]
+        end
+    end
+    
+    A --> B
+    B --> R
+    R --> H
+    H --> S
+    S --> T
+    T --> H
+    H --> V
+    H --> X
+    H --> Y
+    Y --> R
+    R --> B
+    T --> U
+    U --> C
+    W --> D
+    E --> W
+    
+    F --> G
+    G --> H
+    J --> R
+    J --> S
+    J --> T
+    K --> U
+    K --> V
+    L --> W
+    L --> X
+    M --> Y
+```
+
+### Component Interaction Diagram
+
+```mermaid
+sequenceDiagram
+    participant Device as IoT Device
+    participant MQTT as MQTT Broker
+    participant Client as MQTT Client
+    participant Bus as EventBus
+    participant App as ModularApplication
+    participant Norm as Normalizer
+    participant Store as DataStore
+    participant WS as WebSocket
+    participant DB as Database
+    
+    Device->>MQTT: Publish message
+    MQTT->>Client: Forward message
+    Client->>Bus: Emit mqtt.message
+    Bus->>App: Handle message
+    App->>Norm: Normalize message
+    Norm->>App: Return normalized
+    App->>Store: Store message
+    Store->>Bus: Emit data.stored
+    App->>Bus: Emit message.processed
+    Bus->>WS: Broadcast to clients
+    Bus->>DB: Queue for storage
 
 ## Core Components
 
@@ -647,4 +758,744 @@ Resilience Module
 7. **Version Your Changes**: Use semantic versioning for releases
 8. **Monitor Performance**: Track key metrics and optimize bottlenecks
 
-This architecture guide provides a comprehensive understanding of the IoT Middleware v3 system. For specific implementation details, refer to the source code and inline documentation.
+## Testing Strategies
+
+### 1. Unit Testing Components
+
+```javascript
+// Example: Testing a component with mocked dependencies
+const { expect } = require('chai');
+const sinon = require('sinon');
+const MyComponent = require('../modules/myModule/MyComponent');
+const EventBus = require('../core/eventBus');
+
+describe('MyComponent', () => {
+  let myComponent;
+  let eventBus;
+  let logger;
+  
+  beforeEach(() => {
+    // Mock dependencies
+    eventBus = new EventBus();
+    logger = {
+      info: sinon.spy(),
+      error: sinon.spy(),
+      warn: sinon.spy()
+    };
+    
+    // Create component with mocked dependencies
+    myComponent = new MyComponent({
+      eventBus,
+      logger,
+      config: { setting1: 'value1' }
+    });
+  });
+  
+  afterEach(() => {
+    sinon.restore();
+  });
+  
+  describe('initialize()', () => {
+    it('should initialize successfully with valid config', async () => {
+      await myComponent.initialize();
+      expect(logger.info.calledWith('MyComponent initialized')).to.be.true;
+    });
+    
+    it('should throw error with invalid config', async () => {
+      myComponent.options.config = null;
+      try {
+        await myComponent.initialize();
+        expect.fail('Should have thrown an error');
+      } catch (error) {
+        expect(error.message).to.include('Invalid configuration');
+      }
+    });
+  });
+  
+  describe('event handling', () => {
+    it('should handle message.processed events', () => {
+      const testData = { deviceId: 'test', payload: {} };
+      const handler = sinon.spy();
+      
+      eventBus.on('message.processed', handler);
+      eventBus.emit('message.processed', testData);
+      
+      expect(handler.calledOnce).to.be.true;
+      expect(handler.firstCall.args[0]).to.deep.equal(testData);
+    });
+  });
+});
+```
+
+### 2. Integration Testing
+
+```javascript
+// Example: Testing component integration
+const { expect } = require('chai');
+const request = require('supertest');
+const ModularApplication = require('../ModularApplication');
+
+describe('Component Integration', () => {
+  let app;
+  
+  before(async () => {
+    // Initialize application with test configuration
+    app = new ModularApplication({
+      config: {
+        modules: {
+          core: { enabled: true },
+          api: { enabled: true },
+          storage: { enabled: true }
+        }
+      }
+    });
+    
+    await app.initialize();
+  });
+  
+  after(async () => {
+    await app.shutdown();
+  });
+  
+  describe('MQTT to API flow', () => {
+    it('should process MQTT message and make it available via API', async () => {
+      // Simulate MQTT message
+      const mqttMessage = {
+        topic: 'V5008Upload/test123/TemHum',
+        message: Buffer.from('01EC3737BF0A1C30331B0B1C08330B0C000000000D000000000E000000000F0000000001012CC3', 'hex')
+      };
+      
+      // Emit message to event bus
+      app.eventBus.emit('mqtt.message', mqttMessage);
+      
+      // Wait for processing
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Verify data is available via API
+      const response = await request(app.expressApp)
+        .get('/api/devices/test123/data')
+        .expect(200);
+      
+      expect(response.body).to.have.property('data');
+      expect(response.body.data[0]).to.have.property('deviceId', 'test123');
+    });
+  });
+});
+```
+
+### 3. Performance Testing
+
+```javascript
+// Example: Load testing for event processing
+const { performance } = require('perf_hooks');
+const EventBus = require('../core/eventBus');
+
+describe('Performance Tests', () => {
+  let eventBus;
+  
+  beforeEach(() => {
+    eventBus = new EventBus();
+  });
+  
+  it('should handle high-volume events without memory leaks', async () => {
+    const eventCount = 10000;
+    const listeners = [];
+    
+    // Add multiple listeners
+    for (let i = 0; i < 10; i++) {
+      listeners.push(() => {});
+      eventBus.on('test.event', listeners[i]);
+    }
+    
+    const startTime = performance.now();
+    const initialMemory = process.memoryUsage().heapUsed;
+    
+    // Emit events
+    for (let i = 0; i < eventCount; i++) {
+      eventBus.emit('test.event', { id: i });
+    }
+    
+    const endTime = performance.now();
+    const finalMemory = process.memoryUsage().heapUsed;
+    
+    // Clean up
+    listeners.forEach(listener => {
+      eventBus.off('test.event', listener);
+    });
+    
+    // Verify performance
+    const duration = endTime - startTime;
+    const memoryIncrease = finalMemory - initialMemory;
+    
+    expect(duration).to.be.below(1000); // Should complete within 1 second
+    expect(memoryIncrease).to.be.below(50 * 1024 * 1024); // Less than 50MB increase
+  });
+});
+```
+
+### 4. End-to-End Testing
+
+```javascript
+// Example: E2E test with Docker containers
+const { expect } = require('chai');
+const mqtt = require('mqtt');
+const WebSocket = require('ws');
+
+describe('End-to-End Tests', () => {
+  let mqttClient;
+  let wsClient;
+  
+  before(async () => {
+    // Connect to MQTT broker
+    mqttClient = mqtt.connect('mqtt://localhost:1883');
+    await new Promise(resolve => {
+      mqttClient.on('connect', resolve);
+    });
+    
+    // Connect to WebSocket
+    wsClient = new WebSocket('ws://localhost:3000');
+    await new Promise(resolve => {
+      wsClient.on('open', resolve);
+    });
+  });
+  
+  after(async () => {
+    mqttClient.end();
+    wsClient.close();
+  });
+  
+  it('should process message from MQTT to WebSocket', async () => {
+    const messagePromise = new Promise(resolve => {
+      wsClient.on('message', (data) => {
+        resolve(JSON.parse(data.toString()));
+      });
+    });
+    
+    // Publish MQTT message
+    mqttClient.publish('V5008Upload/test456/TemHum',
+      Buffer.from('01EC3737BF0A1C30331B0B1C08330B0C000000000D000000000E000000000F0000000001012CC3', 'hex')
+    );
+    
+    // Wait for WebSocket message
+    const wsMessage = await messagePromise;
+    
+    expect(wsMessage).to.have.property('deviceId', 'test456');
+    expect(wsMessage).to.have.property('deviceType', 'V5008');
+    expect(wsMessage).to.have.property('sensorType', 'TemHum');
+  });
+});
+```
+
+## Deployment Considerations
+
+### 1. Containerization
+
+```dockerfile
+# Dockerfile for IoT Middleware
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci --only=production
+
+# Copy application code
+COPY . .
+
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S nodejs -u 1001
+
+# Change ownership
+RUN chown -R nodejs:nodejs /app
+USER nodejs
+
+# Expose port
+EXPOSE 3000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:3000/health || exit 1
+
+# Start application
+CMD ["node", "server.js"]
+```
+
+### 2. Docker Compose Configuration
+
+```yaml
+# docker-compose.yml
+version: '3.8'
+
+services:
+  iot-middleware:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - MQTT_BROKER_URL=mqtt://mosquitto:1883
+      - DB_HOST=mysql
+      - DB_USER=iotuser
+      - DB_PASSWORD=iotpass
+      - DB_NAME=iotdb
+    depends_on:
+      - mosquitto
+      - mysql
+    volumes:
+      - ./config:/app/config
+      - ./logs:/app/logs
+    restart: unless-stopped
+    
+  mosquitto:
+    image: eclipse-mosquitto:2
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./mosquitto/config:/mosquitto/config
+      - ./mosquitto/data:/mosquitto/data
+      - ./mosquitto/log:/mosquitto/log
+    restart: unless-stopped
+    
+  mysql:
+    image: mysql:8
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpass
+      - MYSQL_DATABASE=iotdb
+      - MYSQL_USER=iotuser
+      - MYSQL_PASSWORD=iotpass
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./config/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    restart: unless-stopped
+    
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+  redis_data:
+```
+
+### 3. Kubernetes Deployment
+
+```yaml
+# k8s-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: iot-middleware
+  labels:
+    app: iot-middleware
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: iot-middleware
+  template:
+    metadata:
+      labels:
+        app: iot-middleware
+    spec:
+      containers:
+      - name: iot-middleware
+        image: iot-middleware:latest
+        ports:
+        - containerPort: 3000
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: MQTT_BROKER_URL
+          value: "mqtt://mosquitto-service:1883"
+        - name: DB_HOST
+          value: "mysql-service"
+        - name: REDIS_HOST
+          value: "redis-service"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: iot-middleware-service
+spec:
+  selector:
+    app: iot-middleware
+  ports:
+    - protocol: TCP
+      port: 3000
+      targetPort: 3000
+  type: LoadBalancer
+```
+
+## Performance Guidelines
+
+### 1. Memory Management
+
+```javascript
+// Memory monitoring and optimization
+class MemoryManager {
+  constructor() {
+    this.memoryThreshold = 500 * 1024 * 1024; // 500MB
+    this.monitoringInterval = 30000; // 30 seconds
+    this.startMonitoring();
+  }
+  
+  startMonitoring() {
+    setInterval(() => {
+      const memoryUsage = process.memoryUsage();
+      
+      if (memoryUsage.heapUsed > this.memoryThreshold) {
+        this.handleHighMemoryUsage(memoryUsage);
+      }
+      
+      // Log memory usage
+      console.log('Memory Usage:', {
+        heapUsed: `${Math.round(memoryUsage.heapUsed / 1024 / 1024)}MB`,
+        heapTotal: `${Math.round(memoryUsage.heapTotal / 1024 / 1024)}MB`,
+        external: `${Math.round(memoryUsage.external / 1024 / 1024)}MB`
+      });
+    }, this.monitoringInterval);
+  }
+  
+  handleHighMemoryUsage(memoryUsage) {
+    console.warn('High memory usage detected:', memoryUsage);
+    
+    // Force garbage collection if available
+    if (global.gc) {
+      global.gc();
+    }
+    
+    // Clear caches
+    if (this.cache) {
+      this.cache.clear();
+    }
+    
+    // Emit warning event
+    eventBus.emit('system.memory.warning', memoryUsage);
+  }
+}
+```
+
+### 2. Connection Pooling
+
+```javascript
+// Database connection pool optimization
+const mysql = require('mysql2/promise');
+
+class DatabasePool {
+  constructor(config) {
+    this.pool = mysql.createPool({
+      host: config.host,
+      user: config.user,
+      password: config.password,
+      database: config.database,
+      waitForConnections: true,
+      connectionLimit: 20, // Adjust based on load
+      queueLimit: 0,
+      acquireTimeout: 60000,
+      timeout: 60000,
+      reconnect: true,
+      idleTimeout: 300000 // 5 minutes
+    });
+    
+    this.monitorPool();
+  }
+  
+  async execute(sql, params) {
+    const start = Date.now();
+    try {
+      const [results] = await this.pool.execute(sql, params);
+      const duration = Date.now() - start;
+      
+      if (duration > 1000) {
+        console.warn(`Slow query detected: ${duration}ms - ${sql}`);
+      }
+      
+      return results;
+    } catch (error) {
+      console.error('Database error:', error);
+      throw error;
+    }
+  }
+  
+  monitorPool() {
+    setInterval(() => {
+      const poolInfo = {
+        totalConnections: this.pool._allConnections.length,
+        freeConnections: this.pool._freeConnections.length,
+        acquiringConnections: this.pool._acquiringConnections.length,
+        waitingConnections: this.pool._connectionQueue.length
+      };
+      
+      console.log('Connection Pool Status:', poolInfo);
+      
+      // Alert if pool is exhausted
+      if (poolInfo.freeConnections === 0 && poolInfo.waitingConnections > 0) {
+        console.warn('Connection pool exhausted, consider increasing limit');
+      }
+    }, 30000);
+  }
+}
+```
+
+### 3. Event Throttling
+
+```javascript
+// Event rate limiting for high-frequency events
+class EventThrottler {
+  constructor(maxEventsPerSecond = 1000) {
+    this.maxEventsPerSecond = maxEventsPerSecond;
+    this.eventCount = 0;
+    this.lastReset = Date.now();
+    this.droppedEvents = 0;
+  }
+  
+  shouldAllowEvent() {
+    const now = Date.now();
+    const secondsSinceReset = (now - this.lastReset) / 1000;
+    
+    // Reset counter every second
+    if (secondsSinceReset >= 1) {
+      this.eventCount = 0;
+      this.lastReset = now;
+      
+      if (this.droppedEvents > 0) {
+        console.warn(`Dropped ${this.droppedEvents} events in the last second`);
+        this.droppedEvents = 0;
+      }
+    }
+    
+    if (this.eventCount >= this.maxEventsPerSecond) {
+      this.droppedEvents++;
+      return false;
+    }
+    
+    this.eventCount++;
+    return true;
+  }
+  
+  throttleEvent(eventBus, eventName, data) {
+    if (this.shouldAllowEvent()) {
+      eventBus.emit(eventName, data);
+    } else {
+      eventBus.emit('event.throttled', { eventName, data });
+    }
+  }
+}
+```
+
+## Troubleshooting
+
+### Common Issues and Solutions
+
+#### 1. Component Initialization Failures
+
+**Symptoms**: Components failing to initialize during startup
+
+**Debugging Steps**:
+```javascript
+// Add detailed initialization logging
+class ComponentRegistry {
+  async initializeComponent(name, component) {
+    const startTime = Date.now();
+    
+    try {
+      console.log(`Initializing component: ${name}`);
+      
+      // Validate configuration
+      this.validateComponentConfig(name, component);
+      
+      // Initialize component
+      await component.initialize();
+      
+      const duration = Date.now() - startTime;
+      console.log(`Component ${name} initialized successfully in ${duration}ms`);
+      
+      this.components.set(name, component);
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      console.error(`Failed to initialize component ${name} after ${duration}ms:`, error);
+      
+      // Continue with other components if optional
+      if (component.optional) {
+        console.warn(`Optional component ${name} failed to initialize, continuing...`);
+        return;
+      }
+      
+      throw error;
+    }
+  }
+  
+  validateComponentConfig(name, component) {
+    const requiredOptions = component.requiredOptions || [];
+    const missingOptions = requiredOptions.filter(opt =>
+      !(opt in component.options)
+    );
+    
+    if (missingOptions.length > 0) {
+      throw new Error(`Component ${name} missing required options: ${missingOptions.join(', ')}`);
+    }
+  }
+}
+```
+
+#### 2. Memory Leaks
+
+**Symptoms**: Increasing memory usage over time
+
+**Detection and Solution**:
+```javascript
+// Memory leak detection
+class MemoryLeakDetector {
+  constructor() {
+    this.snapshots = [];
+    this.threshold = 50 * 1024 * 1024; // 50MB
+  }
+  
+  takeSnapshot() {
+    const snapshot = {
+      timestamp: Date.now(),
+      memory: process.memoryUsage(),
+      listeners: this.getListenerCounts()
+    };
+    
+    this.snapshots.push(snapshot);
+    
+    // Keep only last 10 snapshots
+    if (this.snapshots.length > 10) {
+      this.snapshots.shift();
+    }
+    
+    this.analyzeTrends();
+  }
+  
+  getListenerCounts() {
+    const counts = {};
+    for (const [event, listeners] of eventBus._events) {
+      counts[event] = Array.isArray(listeners) ? listeners.length : 1;
+    }
+    return counts;
+  }
+  
+  analyzeTrends() {
+    if (this.snapshots.length < 2) return;
+    
+    const current = this.snapshots[this.snapshots.length - 1];
+    const previous = this.snapshots[this.snapshots.length - 2];
+    
+    const memoryIncrease = current.memory.heapUsed - previous.memory.heapUsed;
+    
+    if (memoryIncrease > this.threshold) {
+      console.warn('Potential memory leak detected:', {
+        memoryIncrease: `${Math.round(memoryIncrease / 1024 / 1024)}MB`,
+        currentListeners: current.listeners,
+        previousListeners: previous.listeners
+      });
+      
+      // Identify potential listener leaks
+      this.identifyListenerLeaks(current.listeners, previous.listeners);
+    }
+  }
+  
+  identifyListenerLeaks(current, previous) {
+    for (const [event, count] of Object.entries(current)) {
+      const previousCount = previous[event] || 0;
+      if (count > previousCount + 5) { // Threshold for suspicious increase
+        console.warn(`Potential listener leak for event ${event}: ${previousCount} -> ${count}`);
+      }
+    }
+  }
+}
+```
+
+#### 3. Event Processing Bottlenecks
+
+**Symptoms**: Events being processed slowly or backing up
+
+**Solution**:
+```javascript
+// Event processing monitoring
+class EventProcessingMonitor {
+  constructor() {
+    this.processingTimes = new Map();
+    this.queueSizes = new Map();
+    this.startMonitoring();
+  }
+  
+  monitorEvent(eventName, processingFn) {
+    return async (...args) => {
+      const startTime = process.hrtime.bigint();
+      
+      try {
+        const result = await processingFn(...args);
+        
+        const endTime = process.hrtime.bigint();
+        const duration = Number(endTime - startTime) / 1000000; // Convert to ms
+        
+        this.recordProcessingTime(eventName, duration);
+        
+        // Alert on slow events
+        if (duration > 100) {
+          console.warn(`Slow event processing: ${eventName} took ${duration.toFixed(2)}ms`);
+        }
+        
+        return result;
+      } catch (error) {
+        console.error(`Error processing event ${eventName}:`, error);
+        throw error;
+      }
+    };
+  }
+  
+  recordProcessingTime(eventName, duration) {
+    if (!this.processingTimes.has(eventName)) {
+      this.processingTimes.set(eventName, []);
+    }
+    
+    const times = this.processingTimes.get(eventName);
+    times.push(duration);
+    
+    // Keep only last 100 measurements
+    if (times.length > 100) {
+      times.shift();
+    }
+    
+    // Calculate statistics
+    const avg = times.reduce((a, b) => a + b, 0) / times.length;
+    const max = Math.max(...times);
+    
+    if (avg > 50 || max > 500) {
+      console.warn(`Event ${eventName} performance issue: avg=${avg.toFixed(2)}ms, max=${max.toFixed(2)}ms`);
+    }
+  }
+}
+```
+
+This architecture guide provides a comprehensive understanding of the IoT Middleware v3 system, including implementation examples, testing strategies, deployment considerations, and troubleshooting guidance. For specific implementation details, refer to the source code and inline documentation.
