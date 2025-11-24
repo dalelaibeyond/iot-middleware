@@ -1,5 +1,6 @@
 const logger = require("../../utils/logger");
 const { colorJson } = require("../../utils/colorJson");
+const UnifiedNormalizer = require("./UnifiedNormalizer");
 
 /**
  * Configuration constants for V5008 parser
@@ -671,6 +672,22 @@ const MessageFactory = {
   }
 };
 
+// Create unified normalizer instance
+const unifiedNormalizer = new UnifiedNormalizer({
+  devices: {
+    V5008: {
+      enabled: true,
+      stateManagement: {
+        rfid: true,
+        temphum: true,
+        noise: true,
+        color: true,
+        door: true
+      }
+    }
+  }
+});
+
 /**
  * Main parser function for V5008 messages
  * @param {string} topic - MQTT topic
@@ -679,6 +696,41 @@ const MessageFactory = {
  * @returns {Object|null} Normalized message or null on error
  */
 function parse(topic, message, meta = {}) {
+  try {
+    // Check if this is a recursive call from unified normalizer
+    if (meta && meta.fromUnifiedNormalizer) {
+      // If called from unified normalizer, just use the original parser
+      return parseWithV5008Parser(topic, message, meta);
+    }
+    
+    // First parse with existing V5008 parser
+    const parsedMessage = parseWithV5008Parser(topic, message, meta);
+    
+    if (!parsedMessage) {
+      return null;
+    }
+    
+    // Then apply unified normalization
+    const unifiedMessage = unifiedNormalizer.processMessage(parsedMessage, "V5008", topic, {
+      ...meta,
+      originalMessage: parsedMessage
+    });
+    
+    return unifiedMessage;
+  } catch (error) {
+    logger.error(`V5008 unified parsing failed: ${error.message}`);
+    return null;
+  }
+}
+
+/**
+ * Original V5008 parser function
+ * @param {string} topic - MQTT topic
+ * @param {Buffer} message - Raw message buffer
+ * @param {Object} meta - Additional metadata
+ * @returns {Object|null} Parsed message or null on error
+ */
+function parseWithV5008Parser(topic, message, meta = {}) {
   try {
     // Extract device information from topic
     const deviceInfo = MessageUtils.extractDeviceInfo(topic);

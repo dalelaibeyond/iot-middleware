@@ -1,10 +1,12 @@
 const logger = require("../../utils/logger");
 const eventBus = require("../core/eventBus");
+const UnifiedNormalizer = require("./UnifiedNormalizer");
 
 class NormalizerRegistry {
   constructor() {
     this.parsers = new Map();
     this.defaultParser = null;
+    this.unifiedNormalizer = new UnifiedNormalizer();
     this.loadDefaultParsers();
   }
 
@@ -136,9 +138,18 @@ class NormalizerRegistry {
       }
 
       // Parse message with device-specific parser
-      const normalizedMessage = parser.parse(topic, message, meta);
+      let normalizedMessage = parser.parse(topic, message, meta);
       
       if (normalizedMessage) {
+        // Apply unified normalization
+        if (Array.isArray(normalizedMessage)) {
+          normalizedMessage = normalizedMessage.map(msg =>
+            this.unifiedNormalizer.processMessage(msg, deviceType, topic, meta)
+          );
+        } else {
+          normalizedMessage = this.unifiedNormalizer.processMessage(normalizedMessage, deviceType, topic, meta);
+        }
+        
         // Handle array of messages (e.g., from V6800 multi-port devices)
         if (Array.isArray(normalizedMessage)) {
           // Add metadata to each message in the array
@@ -186,6 +197,16 @@ class NormalizerRegistry {
       logger.error(`Normalization failed for topic ${topic}:`, error);
       return null;
     }
+  }
+
+
+
+  /**
+   * Get the unified normalizer instance
+   * @returns {UnifiedNormalizer} The unified normalizer
+   */
+  getUnifiedNormalizer() {
+    return this.unifiedNormalizer;
   }
 
   /**

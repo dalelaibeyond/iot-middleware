@@ -53,7 +53,7 @@ V6800 only provides events (attached/detached) but doesn't maintain a complete s
 
 ### 1. Unified RFID State Management
 
-Implement a state management layer that provides consistent RFID state for both device types:
+Implement a state management layer that provides consistent RFID state for both device types, including previous/last data comparison:
 
 ```javascript
 // Proposed unified RFID structure
@@ -68,27 +68,88 @@ Implement a state management layer that provides consistent RFID state for both 
   payload: {
     uCount: 12,           // Total U-sensor count (consistent across both)
     rfidCount: 3,         // Number of RFID tags currently present
-    rfidData: [           // Unified structure for both devices
-      { 
+    rfidData: [           // Current complete state
+      {
         position: 10,        // Consistent field name
-        rfid: "DD344A44", 
-        state: "attached",   // Always present state
-        lastChanged: "2025-11-17T06:20:15.123Z", // Track when state changed
-        alarm: 0 
+        rfid: "DD344A44",
+        state: "attached",
+        lastChanged: "2025-11-17T06:20:15.123Z",
+        alarm: 0
       },
       // ... more entries
     ],
-    changes: [              // V6800-specific event tracking
+    previousState: {          // Previous complete state for comparison
+      uCount: 12,
+      rfidCount: 2,
+      rfidData: [
+        {
+          position: 10,
+          rfid: "DD344A44",
+          state: "attached",
+          lastChanged: "2025-11-17T05:15:10.123Z",
+          alarm: 0
+        }
+        // Note: Position 11 had no RFID in previous state
+      ]
+    },
+    changes: [              // Delta changes between states
       {
-        position: 3,
-        rfid: "DD23B0B4",
+        position: 11,
+        rfid: "DD2862B4",
         action: "attached",
-        timestamp: "2025-11-17T06:32:07.835Z"
+        timestamp: "2025-11-17T06:32:07.835Z",
+        previousRfid: null,     // No RFID was here before
+        currentRfid: "DD2862B4"
       }
-      // ... recent changes
+      // ... more changes
     ]
   }
 }
+### Data Storage Implementation Details
+
+#### How Maps Save Latest Data
+
+**deviceStates Map Structure:**
+```javascript
+// Key: deviceId (e.g., "2437871205")
+// Value: Map {
+//   modNum1: { uCount: 12, rfidCount: 3, rfidMap: Map {...} },
+//   modNum2: { uCount: 12, rfidCount: 2, rfidMap: Map {...} }
+// }
+```
+
+**stateHistory Map Structure:**
+```javascript
+// Key: "2437871205-2" (deviceId-modNum)
+// Value: { uCount: 12, rfidCount: 2, rfidData: [...] }
+```
+
+#### Data Update Process
+
+1. **New Message Arrives**:
+   - Parse message → Create currentState object
+   - Get previousState from stateHistory
+   - Calculate changes between states
+   - Update deviceStates[modNum] = currentState
+   - Update stateHistory[key] = currentState
+
+2. **Data Persistence**:
+   - deviceStates always contains the MOST RECENT state
+   - stateHistory contains the PREVIOUS state (for comparison)
+   - Both are updated simultaneously after each message
+
+3. **Memory Management**:
+   - Old states can be cleaned up when device goes offline
+   - Maps automatically grow as new modules are detected
+   - No manual cleanup needed for normal operation
+
+#### Why This Works
+
+This approach ensures that:
+- Upper applications always have access to the latest complete state
+- Previous state is available for comparison and change detection
+- No data loss occurs during normal operation
+- Memory usage is optimized by only storing necessary data
 ```
 
 ### 2. Create a Unified Normalization Layer
@@ -96,7 +157,8 @@ Implement a state management layer that provides consistent RFID state for both 
 ```javascript
 class UnifiedRfidNormalizer {
   constructor() {
-    this.deviceStates = new Map(); // Track state for V6800 devices
+    this.deviceStates = new Map(); // Track current state for each device
+    this.stateHistory = new Map(); // Track historical states for comparison
   }
   
   normalize(topic, message, deviceType) {
@@ -111,23 +173,47 @@ class UnifiedRfidNormalizer {
   }
   
   normalizeV5008Rfid(topic, message) {
-    // V5008 already provides complete state
+    const deviceKey = this.extractDeviceKey(topic);
     const normalized = v5008Parser.parse(topic, message);
     
-    // Add unified fields
-    normalized.payload.rfidData = normalized.payload.rfidData.map(tag => ({
-      position: tag.num,
-      rfid: tag.rfid,
-      state: "attached", // V5008 only shows attached tags
-      alarm: tag.alarm
-    }));
+    // Get previous state from history
+    const previousState = this.stateHistory.get(deviceKey);
     
-    return normalized;
+    // Create current state object
+    const currentState = {
+      uCount: normalized.payload.uCount,
+      rfidCount: normalized.payload.rfidCount,
+      rfidData: normalized.payload.rfidData.map(tag => ({
+        position: tag.num,
+        rfid: tag.rfid,
+        state: "attached",
+        lastChanged: new Date().toISOString(), // V5008 doesn't provide timestamps
+        alarm: tag.alarm
+      }))
+    };
+    
+    // Create unified structure with state comparison
+    const unifiedMessage = {
+      ...normalized,
+      payload: {
+        ...normalized.payload,
+        rfidData: currentState.rfidData
+      },
+      previousState: previousState || null,
+      changes: this.calculateChanges(previousState, currentState)
+    };
+    
+    // Store current state in history (not the whole message)
+    this.deviceStates.set(deviceKey, currentState);
+    this.stateHistory.set(deviceKey, currentState);
+    
+    return unifiedMessage;
   }
   
   normalizeV6800Rfid(topic, message) {
     const deviceKey = this.extractDeviceKey(topic);
     const currentState = this.deviceStates.get(deviceKey) || this.createEmptyState();
+    const previousState = this.stateHistory.get(deviceKey);
     
     // Parse V6800 message
     const parsed = v6800Parser.parse(topic, message);
@@ -144,6 +230,14 @@ class UnifiedRfidNormalizer {
   
   updateRfidState(deviceKey, message) {
     const currentState = this.deviceStates.get(deviceKey) || this.createEmptyState();
+    const previousState = this.stateHistory.get(deviceKey);
+    
+    // Store previous state before updating
+    const previousStateCopy = previousState ? {
+      uCount: previousState.uCount,
+      rfidCount: previousState.rfidMap.size,
+      rfidData: Array.from(previousState.rfidMap.values())
+    } : null;
     
     // Process RFID changes
     if (message.payload && message.payload.rfidData) {
@@ -166,21 +260,109 @@ class UnifiedRfidNormalizer {
       });
     }
     
-    // Create unified message
+    // Create current state object
+    const updatedState = {
+      uCount: currentState.uCount,
+      rfidCount: currentState.rfidMap.size,
+      rfidData: Array.from(currentState.rfidMap.values())
+    };
+    
+    // Create unified message with state comparison
     const unifiedMessage = {
       ...message,
       payload: {
-        uCount: currentState.uCount,
-        rfidCount: currentState.rfidMap.size,
-        rfidData: Array.from(currentState.rfidMap.values()),
+        uCount: updatedState.uCount,
+        rfidCount: updatedState.rfidCount,
+        rfidData: updatedState.rfidData,
         changes: message.payload.rfidData || []
-      }
+      },
+      previousState: previousStateCopy
     };
     
-    // Store updated state
-    this.deviceStates.set(deviceKey, currentState);
+    // Store updated state in both maps
+    this.deviceStates.set(deviceKey, updatedState);
+    this.stateHistory.set(deviceKey, updatedState);
     
     return unifiedMessage;
+  }
+  
+  calculateChanges(previousState, currentState) {
+    if (!previousState) {
+      // No previous state, all current tags are new
+      return currentState.rfidData.map(tag => ({
+        position: tag.position,
+        rfid: tag.rfid,
+        action: "attached",
+        timestamp: new Date().toISOString(),
+        previousRfid: null,
+        currentRfid: tag.rfid
+      }));
+    }
+    
+    const previousRfidMap = new Map(
+      previousState.rfidData.map(tag => [tag.position, tag.rfid])
+    );
+    
+    const changes = [];
+    
+    // Check for new or changed tags
+    currentState.rfidData.forEach(currentTag => {
+      const previousRfid = previousRfidMap.get(currentTag.position);
+      
+      if (!previousRfid) {
+        // New tag attached
+        changes.push({
+          position: currentTag.position,
+          rfid: currentTag.rfid,
+          action: "attached",
+          timestamp: new Date().toISOString(),
+          previousRfid: null,
+          currentRfid: currentTag.rfid
+        });
+      } else if (previousRfid !== currentTag.rfid) {
+        // Tag changed
+        changes.push({
+          position: currentTag.position,
+          rfid: currentTag.rfid,
+          action: "changed",
+          timestamp: new Date().toISOString(),
+          previousRfid: previousRfid,
+          currentRfid: currentTag.rfid
+        });
+      }
+    });
+    
+    // Check for detached tags
+    previousRfidMap.forEach((previousRfid, position) => {
+      const stillAttached = currentState.rfidData.some(tag => tag.position === position);
+      
+      if (!stillAttached) {
+        changes.push({
+          position: position,
+          rfid: previousRfid,
+          action: "detached",
+          timestamp: new Date().toISOString(),
+          previousRfid: previousRfid,
+          currentRfid: null
+        });
+      }
+    });
+    
+    return changes;
+  }
+  
+  getLastChanged(previousState, position, currentRfid) {
+    if (!previousState || !previousState.payload || !previousState.payload.rfidData) {
+      return new Date().toISOString(); // No previous state
+    }
+    
+    const previousTag = previousState.payload.rfidData.find(tag => tag.position === position);
+    
+    if (previousTag && previousTag.rfid === currentRfid) {
+      return previousTag.lastChanged; // Same tag, use previous timestamp
+    }
+    
+    return new Date().toISOString(); // New or changed tag
   }
   
   createEmptyState() {

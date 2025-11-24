@@ -1,5 +1,6 @@
 const logger = require("../../utils/logger");
 const { colorJson } = require("../../utils/colorJson");
+const UnifiedNormalizer = require("./UnifiedNormalizer");
 
 /**
  * Configuration constants for V6800 parser
@@ -457,6 +458,22 @@ const MessageFactory = {
   }
 };
 
+// Create unified normalizer instance
+const unifiedNormalizer = new UnifiedNormalizer({
+  devices: {
+    V6800: {
+      enabled: true,
+      stateManagement: {
+        rfid: true,
+        temphum: true,
+        noise: true,
+        color: true,
+        door: true
+      }
+    }
+  }
+});
+
 /**
  * Main parser function for V6800 messages
  * @param {string} topic - MQTT topic
@@ -465,6 +482,35 @@ const MessageFactory = {
  * @returns {Object|Array|null} Normalized message(s) or null on error
  */
 function parse(topic, message, meta = {}) {
+  try {
+    // First parse with existing V6800 parser
+    const parsedMessage = parseWithV6800Parser(topic, message, meta);
+    
+    if (!parsedMessage) {
+      return null;
+    }
+    
+    // Then apply unified normalization
+    const unifiedMessage = unifiedNormalizer.normalize(topic, message, "V6800", {
+      ...meta,
+      originalMessage: parsedMessage
+    });
+    
+    return unifiedMessage;
+  } catch (error) {
+    logger.error(`V6800 unified parsing failed: ${error.message}`);
+    return null;
+  }
+}
+
+/**
+ * Original V6800 parser function
+ * @param {string} topic - MQTT topic
+ * @param {string|Object|Buffer} message - Raw message
+ * @param {Object} meta - Additional metadata
+ * @returns {Object|Array|null} Parsed message(s) or null on error
+ */
+function parseWithV6800Parser(topic, message, meta = {}) {
   try {
     // Parse the raw message
     const rawMessage = Utils.parseMessage(message);
@@ -485,36 +531,30 @@ function parse(topic, message, meta = {}) {
       case "Heartbeat":
         normalizedMessage = MessageFactory.createHeartbeatMessage(rawMessage, topic, meta);
         break;
-      
       case "DevModInfo":
         normalizedMessage = MessageFactory.createDevModInfoMessage(rawMessage, topic, meta);
         break;
-      
       case "Rfid":
       case "RfidReq":
       case "TempHum":
       case "TemHumReq":
       case "Noise":
       case "Door":
+      case "DoorReq":
         normalizedMessage = MessageFactory.createPortBasedMessage(rawMessage, topic, normalizedMsgType, meta);
         break;
-      
       case "ColorReq":
         normalizedMessage = MessageFactory.createColorMessage(rawMessage, topic, meta);
         break;
-      
       case "SetColor":
         normalizedMessage = MessageFactory.createSetColorMessage(rawMessage, topic, meta);
         break;
-      
       case "CleanRfidTamperAlarm":
         normalizedMessage = MessageFactory.createCleanRfidTamperAlarmMessage(rawMessage, topic, meta);
         break;
-      
       case "DoorReq":
         normalizedMessage = MessageFactory.createDoorReqMessage(rawMessage, topic, meta);
         break;
-      
       default:
         normalizedMessage = null;
         logger.warn(`[v6800parser] Unhandled V6800 message type: ${normalizedMsgType}`);
